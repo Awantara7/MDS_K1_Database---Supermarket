@@ -1,3 +1,0 @@
-"0","# Mengecek missing values"
-"0","missing_values <- train_data %>% summarise_all(~sum(is.na(.))) %>% gather(key = ""variable"", value = ""missing_count"")"
-"0","print(missing_values)"

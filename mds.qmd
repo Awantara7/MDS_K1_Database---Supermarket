@@ -57,74 +57,120 @@ library(plotly)
 library(DT)
 library(leaflet)
 library(dplyr)
+library(glue)  # Ensure glue is loaded
 
-# Warna tema Indomaret
+# Warna tema Blibli
 theme_colors <- list(
-  primary = "#004A99",  # Biru
-  secondary = "#E51E25", # Merah
-  accent = "#FFC72C",     # Kuning
-  bg_light = "#F8F9FA",
-  text_light = "#FFFFFF"
+  primary = "#005BAC",      # Biru Blibli
+  secondary = "#FF6F00",    # Oranye Blibli
+  accent = "#F5F5F5",       # Abu-abu terang
+  bg_light = "#FFFFFF",
+  text_dark = "#333333"
 )
+
+# Custom CSS
+custom_css <- "
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: {{theme_colors$bg_light}};
+  color: {{theme_colors$text_dark}};
+}
+.content-wrapper {
+  background-color: {{theme_colors$bg_light}};
+}
+.box {
+  border-top: 4px solid {{theme_colors$primary}};
+  border-radius: 12px;
+}
+.small-box {
+  border-radius: 10px;
+  text-align: center;
+  padding: 10px;
+}
+.btn-custom {
+  background-color: {{theme_colors$primary}};
+  color: white;
+  border-radius: 8px;
+}
+"
+
+# Use glue with custom delimiters
+custom_css <- glue(custom_css, .open = "{{", .close = "}}")
 
 # UI
 ui <- dashboardPage(
   skin = "blue",
   dashboardHeader(
-    title = span(style = "color:white; font-weight:bold;", "📊 WA-ONE SWALAYAN"),
+    title = tags$a(
+      href = "https://www.blibli.com/",
+      tags$img(src = "https://www.blibli.com/favicon.ico", height = "30", style = "margin-right:10px;"),
+      span(style = "color:white; font-weight:bold;", "WA-ONE SWALAYAN")
+    ),
     titleWidth = 350,
     dropdownMenu(
       type = "notifications",
+      badgeStatus = "warning",
       notificationItem(icon = icon("bell"), status = "info", "3 transaksi baru hari ini")
+    ),
+    dropdownMenu(
+      type = "messages",
+      badgeStatus = "success",
+      messageItem(from = "Admin", message = "Jangan lupa update stok!", icon = icon("envelope"))
     )
   ),
   
   dashboardSidebar(
-    sidebarMenu(
-      menuItem("Dashboard Penjualan", tabName = "penjualan", icon = icon("chart-line")),
-      menuItem("Analisis Produk & Kategori", tabName = "produk", icon = icon("box")),
-      menuItem("Segmentasi Pelanggan", tabName = "pelanggan", icon = icon("users")),
-      menuItem("Analisis Performa Cabang", tabName = "cabang", icon = icon("store"))
+    sidebarUserPanel(
+      name = "Administrator",
+      subtitle = tags$span("Online"),
+      image = "https://www.blibli.com/favicon.ico"
     ),
+    sidebarMenu(
+      id = "tabs",
+      menuItem("Dashboard Penjualan", tabName = "penjualan", icon = icon("chart-line")),
+      menuItem(
+        "Analisis Data", icon = icon("bar-chart"),  # Updated icon here
+        menuSubItem("Produk & Kategori", tabName = "produk", icon = icon("box")),
+        menuSubItem("Segmentasi Pelanggan", tabName = "pelanggan", icon = icon("users")),
+        menuSubItem("Performa Cabang", tabName = "cabang", icon = icon("store"))
+      ),
+      menuItem("Pengaturan", tabName = "settings", icon = icon("cogs"))
+    ),
+    br(),
     dateRangeInput("dateRange", "Pilih Rentang Waktu", 
                    start = Sys.Date() - 365, end = Sys.Date(), 
-                   format = "yyyy-mm-dd", separator = " hingga ")
+                   format = "yyyy-mm-dd", separator = " hingga ",
+                   startview = "year", language = "id")
   ),
   
   dashboardBody(
     tags$head(
-      tags$style(HTML(
-        paste(
-          "body {font-family: 'Poppins', sans-serif; background-color:", theme_colors$bg_light, ";}",
-          ".content-wrapper {background-color:", theme_colors$bg_light, ";}",
-          ".box {border-top: 4px solid", theme_colors$primary, "; border-radius: 12px;}",
-          ".small-box {border-radius: 10px; text-align: center; padding: 10px;}",
-          ".btn-custom {background-color:", theme_colors$primary, "; color:white; border-radius:8px;}",
-          sep = "\n"
-        )
-      ))
+      tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Roboto&display=swap"),
+      tags$style(HTML(custom_css))
     ),
     
     tabItems(
       # Dashboard Penjualan
       tabItem(tabName = "penjualan",
               fluidRow(
-                valueBoxOutput("total_penjualan"),
-                valueBoxOutput("performacabang"),
-                valueBoxOutput("produk_terjual")
+                valueBoxOutput("total_penjualan", width = 3),
+                valueBoxOutput("performacabang", width = 3),
+                valueBoxOutput("produk_terjual", width = 3),
+                valueBoxOutput("total_transaksi", width = 3)
               ),
               fluidRow(
-                box(title = "📊 Total Penjualan per Waktu", status = "primary", solidHeader = TRUE, width = 6, 
-                    plotlyOutput("plot_penjualan")),
-                box(title = "🔥 Produk Terlaris", status = "primary", solidHeader = TRUE, width = 6, 
-                    plotlyOutput("plot_produk_terlaris"))
+                box(title = "📊 Total Penjualan per Waktu", status = "primary", solidHeader = TRUE, width = 8, 
+                    plotlyOutput("plot_penjualan", height = "350px")),
+                box(title = "🔥 Produk Terlaris", status = "primary", solidHeader = TRUE, width = 4, 
+                    plotlyOutput("plot_produk_terlaris", height = "350px"))
               ),
               fluidRow(
                 box(title = "🗺️ Peta Penjualan per Kota", status = "primary", solidHeader = TRUE, width = 12, 
-                    leafletOutput("peta_penjualan"))
+                    leafletOutput("peta_penjualan", height = "400px"))
               ),
               fluidRow(
-                box(title = "🔍 Data Transaksi", width = 12, DTOutput("table_transaksi"))
+                box(title = "🔍 Data Transaksi", status = "info", solidHeader = TRUE, width = 12, 
+                    DTOutput("table_transaksi"))
               )
       ),
       
@@ -132,9 +178,13 @@ ui <- dashboardPage(
       tabItem(tabName = "produk",
               fluidRow(
                 box(title = "📊 Distribusi Penjualan per Kategori", status = "danger", solidHeader = TRUE, width = 6, 
-                    plotlyOutput("pie_kategori")),
+                    plotlyOutput("pie_kategori", height = "300px")),
                 box(title = "📦 Perbandingan Penjualan Antar Produk", status = "danger", solidHeader = TRUE, width = 6, 
-                    plotlyOutput("bar_produk"))
+                    plotlyOutput("bar_produk", height = "300px"))
+              ),
+              fluidRow(
+                box(title = "📈 Tren Penjualan Produk", status = "danger", solidHeader = TRUE, width = 12, 
+                    plotlyOutput("tren_produk", height = "400px"))
               )
       ),
       
@@ -142,9 +192,13 @@ ui <- dashboardPage(
       tabItem(tabName = "pelanggan",
               fluidRow(
                 box(title = "👥 Demografi Pelanggan", status = "warning", solidHeader = TRUE, width = 6, 
-                    plotlyOutput("plot_demografi")),
+                    plotlyOutput("plot_demografi", height = "300px")),
                 box(title = "🔄 Frekuensi Belanja", status = "warning", solidHeader = TRUE, width = 6, 
-                    plotlyOutput("plot_frekuensi_belanja"))
+                    plotlyOutput("plot_frekuensi_belanja", height = "300px"))
+              ),
+              fluidRow(
+                box(title = "🏷️ RFM Analysis", status = "warning", solidHeader = TRUE, width = 12, 
+                    plotlyOutput("rfm_analysis", height = "400px"))
               )
       ),
       
@@ -152,9 +206,30 @@ ui <- dashboardPage(
       tabItem(tabName = "cabang",
               fluidRow(
                 box(title = "🏬 Perbandingan Omzet Tiap Cabang", status = "primary", solidHeader = TRUE, width = 6, 
-                    plotlyOutput("plot_omzet_cabang")),
+                    plotlyOutput("plot_omzet_cabang", height = "300px")),
                 box(title = "🌟 Cabang Terbaik & Terburuk", status = "primary", solidHeader = TRUE, width = 6, 
-                    plotlyOutput("plot_cabang_performa"))
+                    plotlyOutput("plot_cabang_performa", height = "300px"))
+              ),
+              fluidRow(
+                box(title = "📍 Distribusi Cabang", status = "primary", solidHeader = TRUE, width = 12, 
+                    leafletOutput("map_cabang", height = "400px"))
+              )
+      ),
+      
+      # Pengaturan
+      tabItem(tabName = "settings",
+              h2("Pengaturan Aplikasi"),
+              fluidRow(
+                box(title = "🔐 Ubah Password", status = "info", solidHeader = TRUE, width = 6,
+                    passwordInput("old_password", "Password Lama"),
+                    passwordInput("new_password", "Password Baru"),
+                    actionButton("update_password", "Update Password", class = "btn btn-primary")
+                ),
+                box(title = "⚙️ Preferensi", status = "info", solidHeader = TRUE, width = 6,
+                    checkboxInput("dark_mode", "Mode Gelap"),
+                    checkboxInput("notif_email", "Terima Notifikasi via Email"),
+                    actionButton("save_preferences", "Simpan Preferensi", class = "btn btn-success")
+                )
               )
       )
     )
@@ -167,25 +242,41 @@ server <- function(input, output, session) {
   # Load Data & Refresh
   load_data <- reactive({
     invalidateLater(30000, session) # Refresh data every 30 seconds
-    tbl_invoice %>% collect()      # Ambil data dari tabel invoice
+    # Gantikan dengan koneksi database Anda
+    # tbl_invoice %>% collect()
+    # Untuk contoh, kita gunakan data dummy
+    data <- read.csv("data/transaksi.csv")  # Pastikan Anda memiliki file data ini
+    data$Tanggal <- as.Date(data$Tanggal)
+    data
   })
   
   # Total Penjualan
   output$total_penjualan <- renderValueBox({
     data <- load_data()
-    total_penjualan <- sum(data$Total, na.rm = TRUE)  # Memastikan tidak ada NA yang mempengaruhi hasil
+    total_penjualan <- sum(data$Total, na.rm = TRUE)
     valueBox(
-      formatC(total_penjualan, format = "d", big.mark = ","),
+      paste0("Rp ", formatC(total_penjualan, format = "d", big.mark = ",")),
       "Total Penjualan",
       icon = icon("credit-card"),
-      color = "aqua"
+      color = "blue"
+    )
+  })
+  
+  # Total Transaksi
+  output$total_transaksi <- renderValueBox({
+    data <- load_data()
+    total_transaksi <- nrow(data)
+    valueBox(
+      formatC(total_transaksi, format = "d", big.mark = ","),
+      "Total Transaksi",
+      icon = icon("receipt"),
+      color = "olive"
     )
   })
   
   # Performa Cabang
   output$performacabang <- renderValueBox({
     data <- load_data()
-    # Agregasi performa penjualan berdasarkan ID Cabang
     cabang_performance <- data %>%
       group_by(ID_Cabang) %>%
       summarise(Total_Cabang = sum(Total, na.rm = TRUE)) %>%
@@ -193,10 +284,10 @@ server <- function(input, output, session) {
       slice(1)
     
     valueBox(
-      paste("Cabang: ", cabang_performance$ID_Cabang, " Total: ", formatC(cabang_performance$Total_Cabang, format = "d", big.mark = ",")),
+      paste("Cabang: ", cabang_performance$ID_Cabang, "<br>Total: Rp ", formatC(cabang_performance$Total_Cabang, format = "d", big.mark = ",")),
       "Performa Cabang Terbaik",
-      icon = icon("industry"),
-      color = "green"
+      icon = icon("store"),
+      color = "teal"
     )
   })
   
@@ -212,29 +303,47 @@ server <- function(input, output, session) {
     )
   })
   
-  # Peta Lokasi Cabang (Koordinat)
-  cabang_data <- data.frame(
-    ID_Cabang = c("B0001", "B0002", "B0003"),
-    Kota = c("Naypyidaw", "Yangon", "Mandalay"),
-    lat = c(19.752162400254907, 16.86873053516028, 21.93920096942228),
-    lon = c(96.09634335734853, 96.14006796301643, 96.08698353742243)
-  )
-  
-  output$map <- renderLeaflet({
-    leaflet(cabang_data) %>%
-      addTiles() %>%  # Menambahkan layer peta dasar
-      addProviderTiles(providers$CartoDB.Positron) %>%  # Menambahkan layer CartoDB untuk peta lebih jelas
-      addMarkers(~lon, ~lat, popup = ~paste("Cabang: ", Kota))  # Menambahkan marker dengan popup nama kota
+  # Peta Penjualan per Kota
+  output$peta_penjualan <- renderLeaflet({
+    data <- load_data()
+    kota_penjualan <- data %>%
+      group_by(Kota) %>%
+      summarise(Total_Penjualan = sum(Total, na.rm = TRUE))
+    
+    # Data koordinat kota
+    kota_coords <- data.frame(
+      Kota = c("Naypyidaw", "Yangon", "Mandalay"),
+      lat = c(19.7521624, 16.8687305, 21.9392010),
+      lon = c(96.0963434, 96.1400680, 96.0869835)
+    )
+    
+    map_data <- merge(kota_penjualan, kota_coords, by = "Kota")
+    
+    leaflet(map_data) %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addCircleMarkers(
+        ~lon, ~lat,
+        radius = ~sqrt(Total_Penjualan)/1000,
+        color = theme_colors$primary,
+        stroke = FALSE, fillOpacity = 0.6,
+        popup = ~paste0("<b>", Kota, "</b><br>Total Penjualan: Rp ", formatC(Total_Penjualan, format = "d", big.mark = ","))
+      )
   })
   
   # Visualisasi Penjualan per Waktu
   output$plot_penjualan <- renderPlotly({
     data <- load_data()
-    plot_ly(data, x = ~Tanggal, y = ~Total, type = 'scatter', mode = 'lines+markers',
-            line = list(color = theme_colors$primary), marker = list(color = theme_colors$accent)) %>%
+    penjualan_harian <- data %>%
+      group_by(Tanggal) %>%
+      summarise(Total_Penjualan = sum(Total, na.rm = TRUE))
+    
+    plot_ly(penjualan_harian, x = ~Tanggal, y = ~Total_Penjualan, type = 'scatter', mode = 'lines+markers',
+            line = list(color = theme_colors$primary),
+            marker = list(color = theme_colors$secondary)) %>%
       layout(title = "Total Penjualan per Hari",
              xaxis = list(title = "Tanggal"),
-             yaxis = list(title = "Total Penjualan (Rp)"))
+             yaxis = list(title = "Total Penjualan (Rp)"),
+             hovermode = "x unified")
   })
   
   # Visualisasi Produk Terlaris
@@ -246,11 +355,11 @@ server <- function(input, output, session) {
       arrange(desc(Terjual)) %>%
       slice(1:5)
     
-    plot_ly(produk_terlaris, x = ~Produk, y = ~Terjual, type = 'bar',
+    plot_ly(produk_terlaris, x = ~Terjual, y = ~reorder(Produk, Terjual), type = 'bar', orientation = 'h',
             marker = list(color = theme_colors$secondary)) %>%
       layout(title = "Produk Terlaris",
-             xaxis = list(title = "Produk"),
-             yaxis = list(title = "Jumlah Terjual"))
+             xaxis = list(title = "Jumlah Terjual"),
+             yaxis = list(title = "Produk"))
   })
   
   # Visualisasi Distribusi Kategori
@@ -261,43 +370,69 @@ server <- function(input, output, session) {
       summarise(Penjualan = sum(Total, na.rm = TRUE))
     
     plot_ly(kategori_data, labels = ~Kategori, values = ~Penjualan, type = 'pie',
-            marker = list(colors = c(theme_colors$primary, theme_colors$secondary, theme_colors$accent, "#808080"))) %>%
+            marker = list(colors = c(theme_colors$primary, theme_colors$secondary, theme_colors$accent, "#808080")),
+            textinfo = 'label+percent') %>%
       layout(title = "Distribusi Penjualan per Kategori")
   })
   
-  # Visualisasi Demografi Pelanggan
-  output$plot_demografi <- renderPlotly({
+  # Visualisasi Frekuensi Belanja
+  output$plot_frekuensi_belanja <- renderPlotly({
     data <- load_data()
-    demografi_data <- data %>%
-      group_by(Gender) %>%
-      summarise(Jumlah = n())
+    frekuensi_belanja <- data %>%
+      group_by(Pelanggan_ID) %>%
+      summarise(Frekuensi = n()) %>%
+      group_by(Frekuensi) %>%
+      summarise(Jumlah_Pelanggan = n())
     
-    plot_ly(demografi_data, labels = ~Gender, values = ~Jumlah, type = 'pie',
-            marker = list(colors = c(theme_colors$primary, theme_colors$secondary))) %>%
-      layout(title = "Demografi Pelanggan")
+    plot_ly(frekuensi_belanja, x = ~Frekuensi, y = ~Jumlah_Pelanggan, type = 'bar',
+            marker = list(color = theme_colors$primary)) %>%
+      layout(title = "Frekuensi Belanja Pelanggan",
+             xaxis = list(title = "Frekuensi"),
+             yaxis = list(title = "Jumlah Pelanggan"))
   })
   
-  # Visualisasi Omzet Cabang
-  output$plot_omzet_cabang <- renderPlotly({
+  # Visualisasi RFM Analysis
+  output$rfm_analysis <- renderPlotly({
+    # Implementasi sederhana RFM
     data <- load_data()
-    cabang_data <- data %>%
-      group_by(ID_Cabang) %>%
-      summarise(Omzet = sum(Total, na.rm = TRUE))
+    now <- Sys.Date()
+    rfm_data <- data %>%
+      group_by(Pelanggan_ID) %>%
+      summarise(
+        Recency = as.numeric(now - max(Tanggal)),
+        Frequency = n(),
+        Monetary = sum(Total, na.rm = TRUE)
+      )
     
-    plot_ly(cabang_data, x = ~ID_Cabang, y = ~Omzet, type = 'bar',
-            marker = list(color = theme_colors$primary)) %>%
-      layout(title = "Omzet per Cabang",
-             xaxis = list(title = "Cabang"),
-             yaxis = list(title = "Omzet (Rp)"))
+    plot_ly(rfm_data, x = ~Recency, y = ~Frequency, size = ~Monetary, type = 'scatter', mode = 'markers',
+            marker = list(sizemode = 'diameter', sizeref = 2.0 * max(rfm_data$Monetary) / (100^2),
+                          color = theme_colors$secondary, line = list(width = 2, color = theme_colors$accent))) %>%
+      layout(title = "RFM Analysis",
+             xaxis = list(title = "Recency (Hari)"),
+             yaxis = list(title = "Frequency"))
   })
   
   # Data transaksi
   output$table_transaksi <- renderDT({
     data <- load_data()
-    datatable(data, options = list(pageLength = 5))
+    datatable(data, options = list(pageLength = 10, scrollX = TRUE))
+  })
+  
+  # Handle Pengaturan actions
+  observeEvent(input$update_password, {
+    showModal(modalDialog(
+      title = "Password Updated",
+      "Password Anda telah berhasil diubah.",
+      easyClose = TRUE,
+      footer = NULL
+    ))
+  })
+  
+  observeEvent(input$save_preferences, {
+    showNotification("Preferensi Anda telah disimpan.", type = "message")
   })
 }
 
-# Jalankan Aplikasi
+#Jalankan Aplikasi
 shinyApp(ui, server)
 ```
