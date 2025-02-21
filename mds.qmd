@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ```{r}
 library(shiny)
 library(shinythemes)
@@ -33,8 +32,6 @@ con <- dbConnect(RMariaDB::MariaDB(),
 )
 ```
 
-
-
 ```{r}
 # Load tabel dari database
 tbl_cabang <- tbl(con, "Cabang")
@@ -51,59 +48,113 @@ print(tbl_produk)
 ```
 
 ```{r}
+library(shiny)
+library(shinydashboard)
+library(shinydashboardPlus)
+library(shinyWidgets)
+library(ggplot2)
+library(plotly)
+library(DT)
+library(leaflet)
+library(dplyr)
 
-# UI Dashboard
+# Warna tema Indomaret
+theme_colors <- list(
+  primary = "#004A99",  # Biru
+  secondary = "#E51E25", # Merah
+  accent = "#FFC72C",     # Kuning
+  bg_light = "#F8F9FA",
+  text_light = "#FFFFFF"
+)
+
+# UI
 ui <- dashboardPage(
   skin = "blue",
-  
   dashboardHeader(
-    title = "📊 Supermarket XXX",
-    titleWidth = 300
+    title = span(style = "color:white; font-weight:bold;", "📊 WA-ONE SWALAYAN"),
+    titleWidth = 350,
+    dropdownMenu(
+      type = "notifications",
+      notificationItem(icon = icon("bell"), status = "info", "3 transaksi baru hari ini")
+    )
   ),
   
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Dashboard Utama", tabName = "main_dashboard", icon = icon("dashboard")),
-      menuItem("Cabang", tabName = "penjualan", icon = icon("industry")),
-      menuItem("Produk", tabName = "produk", icon = icon("gift")),
-      menuItem("Pelanggan", tabName = "pelanggan", icon = icon("users"))
-    )
+      menuItem("Dashboard Penjualan", tabName = "penjualan", icon = icon("chart-line")),
+      menuItem("Analisis Produk & Kategori", tabName = "produk", icon = icon("box")),
+      menuItem("Segmentasi Pelanggan", tabName = "pelanggan", icon = icon("users")),
+      menuItem("Analisis Performa Cabang", tabName = "cabang", icon = icon("store"))
+    ),
+    dateRangeInput("dateRange", "Pilih Rentang Waktu", 
+                   start = Sys.Date() - 365, end = Sys.Date(), 
+                   format = "yyyy-mm-dd", separator = " hingga ")
   ),
   
   dashboardBody(
+    tags$head(
+      tags$style(HTML(
+        paste(
+          "body {font-family: 'Poppins', sans-serif; background-color:", theme_colors$bg_light, ";}",
+          ".content-wrapper {background-color:", theme_colors$bg_light, ";}",
+          ".box {border-top: 4px solid", theme_colors$primary, "; border-radius: 12px;}",
+          ".small-box {border-radius: 10px; text-align: center; padding: 10px;}",
+          ".btn-custom {background-color:", theme_colors$primary, "; color:white; border-radius:8px;}",
+          sep = "\n"
+        )
+      ))
+    ),
+    
     tabItems(
-      # Main Dashboard Tab
-      tabItem(tabName = "main_dashboard",
-              fluidRow(
-                valueBoxOutput("total_penjualan"),
-                valueBoxOutput("performacabang")
-              ),
-              fluidRow(
-                leafletOutput("map", height = "400px")
-              )
-      ),
-      
-      # Penjualan per Cabang Tab
+      # Dashboard Penjualan
       tabItem(tabName = "penjualan",
               fluidRow(
-                column(6, DTOutput("penjualan_table")),
-                column(6, plotlyOutput("penjualan_chart_detail"))
+                valueBoxOutput("total_penjualan"),
+                valueBoxOutput("performacabang"),
+                valueBoxOutput("produk_terjual")
+              ),
+              fluidRow(
+                box(title = "📊 Total Penjualan per Waktu", status = "primary", solidHeader = TRUE, width = 6, 
+                    plotlyOutput("plot_penjualan")),
+                box(title = "🔥 Produk Terlaris", status = "primary", solidHeader = TRUE, width = 6, 
+                    plotlyOutput("plot_produk_terlaris"))
+              ),
+              fluidRow(
+                box(title = "🗺️ Peta Penjualan per Kota", status = "primary", solidHeader = TRUE, width = 12, 
+                    leafletOutput("peta_penjualan"))
+              ),
+              fluidRow(
+                box(title = "🔍 Data Transaksi", width = 12, DTOutput("table_transaksi"))
               )
       ),
       
-      # Produk Terlaris Tab
+      # Analisis Produk & Kategori
       tabItem(tabName = "produk",
               fluidRow(
-                column(6, DTOutput("produk_table")),
-                column(6, plotlyOutput("produk_chart"))
+                box(title = "📊 Distribusi Penjualan per Kategori", status = "danger", solidHeader = TRUE, width = 6, 
+                    plotlyOutput("pie_kategori")),
+                box(title = "📦 Perbandingan Penjualan Antar Produk", status = "danger", solidHeader = TRUE, width = 6, 
+                    plotlyOutput("bar_produk"))
               )
       ),
       
-      # Pelanggan Tab
+      # Segmentasi Pelanggan
       tabItem(tabName = "pelanggan",
               fluidRow(
-                column(6, plotlyOutput("gender_chart")),
-                column(6, plotlyOutput("pelanggan_chart"))
+                box(title = "👥 Demografi Pelanggan", status = "warning", solidHeader = TRUE, width = 6, 
+                    plotlyOutput("plot_demografi")),
+                box(title = "🔄 Frekuensi Belanja", status = "warning", solidHeader = TRUE, width = 6, 
+                    plotlyOutput("plot_frekuensi_belanja"))
+              )
+      ),
+      
+      # Analisis Performa Cabang
+      tabItem(tabName = "cabang",
+              fluidRow(
+                box(title = "🏬 Perbandingan Omzet Tiap Cabang", status = "primary", solidHeader = TRUE, width = 6, 
+                    plotlyOutput("plot_omzet_cabang")),
+                box(title = "🌟 Cabang Terbaik & Terburuk", status = "primary", solidHeader = TRUE, width = 6, 
+                    plotlyOutput("plot_cabang_performa"))
               )
       )
     )
@@ -131,7 +182,7 @@ server <- function(input, output, session) {
     )
   })
   
-  # Performace Cabang
+  # Performa Cabang
   output$performacabang <- renderValueBox({
     data <- load_data()
     # Agregasi performa penjualan berdasarkan ID Cabang
@@ -149,6 +200,18 @@ server <- function(input, output, session) {
     )
   })
   
+  # Produk Terjual
+  output$produk_terjual <- renderValueBox({
+    data <- load_data()
+    total_produk_terjual <- sum(data$Jumlah, na.rm = TRUE)
+    valueBox(
+      formatC(total_produk_terjual, format = "d", big.mark = ","),
+      "Produk Terjual",
+      icon = icon("shopping-cart"),
+      color = "yellow"
+    )
+  })
+  
   # Peta Lokasi Cabang (Koordinat)
   cabang_data <- data.frame(
     ID_Cabang = c("B0001", "B0002", "B0003"),
@@ -163,17 +226,78 @@ server <- function(input, output, session) {
       addProviderTiles(providers$CartoDB.Positron) %>%  # Menambahkan layer CartoDB untuk peta lebih jelas
       addMarkers(~lon, ~lat, popup = ~paste("Cabang: ", Kota))  # Menambahkan marker dengan popup nama kota
   })
+  
+  # Visualisasi Penjualan per Waktu
+  output$plot_penjualan <- renderPlotly({
+    data <- load_data()
+    plot_ly(data, x = ~Tanggal, y = ~Total, type = 'scatter', mode = 'lines+markers',
+            line = list(color = theme_colors$primary), marker = list(color = theme_colors$accent)) %>%
+      layout(title = "Total Penjualan per Hari",
+             xaxis = list(title = "Tanggal"),
+             yaxis = list(title = "Total Penjualan (Rp)"))
+  })
+  
+  # Visualisasi Produk Terlaris
+  output$plot_produk_terlaris <- renderPlotly({
+    data <- load_data()
+    produk_terlaris <- data %>%
+      group_by(Produk) %>%
+      summarise(Terjual = sum(Jumlah, na.rm = TRUE)) %>%
+      arrange(desc(Terjual)) %>%
+      slice(1:5)
+    
+    plot_ly(produk_terlaris, x = ~Produk, y = ~Terjual, type = 'bar',
+            marker = list(color = theme_colors$secondary)) %>%
+      layout(title = "Produk Terlaris",
+             xaxis = list(title = "Produk"),
+             yaxis = list(title = "Jumlah Terjual"))
+  })
+  
+  # Visualisasi Distribusi Kategori
+  output$pie_kategori <- renderPlotly({
+    data <- load_data()
+    kategori_data <- data %>%
+      group_by(Kategori) %>%
+      summarise(Penjualan = sum(Total, na.rm = TRUE))
+    
+    plot_ly(kategori_data, labels = ~Kategori, values = ~Penjualan, type = 'pie',
+            marker = list(colors = c(theme_colors$primary, theme_colors$secondary, theme_colors$accent, "#808080"))) %>%
+      layout(title = "Distribusi Penjualan per Kategori")
+  })
+  
+  # Visualisasi Demografi Pelanggan
+  output$plot_demografi <- renderPlotly({
+    data <- load_data()
+    demografi_data <- data %>%
+      group_by(Gender) %>%
+      summarise(Jumlah = n())
+    
+    plot_ly(demografi_data, labels = ~Gender, values = ~Jumlah, type = 'pie',
+            marker = list(colors = c(theme_colors$primary, theme_colors$secondary))) %>%
+      layout(title = "Demografi Pelanggan")
+  })
+  
+  # Visualisasi Omzet Cabang
+  output$plot_omzet_cabang <- renderPlotly({
+    data <- load_data()
+    cabang_data <- data %>%
+      group_by(ID_Cabang) %>%
+      summarise(Omzet = sum(Total, na.rm = TRUE))
+    
+    plot_ly(cabang_data, x = ~ID_Cabang, y = ~Omzet, type = 'bar',
+            marker = list(color = theme_colors$primary)) %>%
+      layout(title = "Omzet per Cabang",
+             xaxis = list(title = "Cabang"),
+             yaxis = list(title = "Omzet (Rp)"))
+  })
+  
+  # Data transaksi
+  output$table_transaksi <- renderDT({
+    data <- load_data()
+    datatable(data, options = list(pageLength = 5))
+  })
 }
 
 # Jalankan Aplikasi
 shinyApp(ui, server)
-
-
-
-
-
 ```
-
-
-
-
