@@ -1,0 +1,208 @@
+---
+title: "Database -Supermarket"
+format: html
+editor: visual
+---
+
+
+```{r}
+library(shiny)
+library(shinythemes)
+library(shinyWidgets)
+library(shinydashboard)
+library(DBI)
+library(RMariaDB)
+library(dplyr)
+library(dbplyr)
+library(ggplot2)
+library(plotly)
+library(DT)
+library(leaflet)
+library(ggmap)
+library(tidygeocoder)
+```
+
+```{r}
+# Koneksi ke database 'Data' di MySQL (port 3307)
+con <- dbConnect(RMariaDB::MariaDB(),
+                 dbname = "data csv",  # Nama database yang sudah ada
+                 host = "127.0.0.1",    
+                 port = 3307,  # Pastikan port yang benar (3307)
+                 user = "root",         
+                 password = ""  # Sesuaikan jika ada password
+)
+```
+
+
+
+```{r}
+# Load tabel dari database
+tbl_cabang <- tbl(con, "Cabang")
+tbl_invoice <- tbl(con, "Invoice")
+tbl_pelanggan <- tbl(con, "Pelanggan")
+tbl_produk <- tbl(con, "Produk")
+```
+
+```{r}
+print(tbl_cabang)
+print(tbl_invoice)
+print(tbl_pelanggan)
+print(tbl_produk)
+```
+
+```{r}
+# UI Dashboard
+ui <- dashboardPage(
+  skin = "blue",
+  
+  dashboardHeader(
+    title = "📊 Supermarket XXX",
+    titleWidth = 300
+  ),
+  
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Dashboard Utama", tabName = "main_dashboard", icon = icon("dashboard")),
+      menuItem("Cabang", tabName = "penjualan", icon = icon("industry")),
+      menuItem("Produk", tabName = "produk", icon = icon("gift")),
+      menuItem("Pelanggan", tabName = "pelanggan", icon = icon("users"))
+    )
+  ),
+  
+  dashboardBody(
+    tags$style(
+      HTML("
+        .value-box {
+          height: 200px; /* Mengatur tinggi box */
+          overflow-y: scroll; /* Menambahkan scroll jika konten terlalu panjang */
+        }
+      ")
+    ),
+    tabItems(
+      # Main Dashboard Tab
+      tabItem(tabName = "main_dashboard",
+              fluidRow(
+                column(4, valueBoxOutput("total_penjualan")),
+                column(4, valueBoxOutput("total_transaksi")),
+                column(4, valueBoxOutput("total_jenis_produk"))
+              ),
+              fluidRow(
+                leafletOutput("map", height = "400px")
+              )
+      ),
+      
+      # Penjualan per Cabang Tab
+      tabItem(tabName = "penjualan",
+              fluidRow(
+                column(6, DTOutput("penjualan_table")),
+                column(6, plotlyOutput("penjualan_chart_detail"))
+              )
+      ),
+      
+      # Produk Terlaris Tab
+      tabItem(tabName = "produk",
+              fluidRow(
+                column(6, DTOutput("produk_table")),
+                column(6, plotlyOutput("produk_chart"))
+              )
+      ),
+      
+      # Pelanggan Tab
+      tabItem(tabName = "pelanggan",
+              fluidRow(
+                column(6, plotlyOutput("gender_chart")),
+                column(6, plotlyOutput("pelanggan_chart"))
+              )
+      )
+    )
+  )
+)
+
+# Server
+server <- function(input, output, session) {
+  
+  # Load Data & Refresh
+  load_data <- reactive({
+    invalidateLater(30000, session) # Refresh data every 30 seconds
+    data <- tbl_invoice %>% collect()      # Ambil data dari tabel invoice
+    data$Tanggal <- as.Date(data$Tanggal, format = "%m/%d/%Y")  # Memastikan format tanggal yang benar
+    return(data)
+  })
+  
+  # Total Penjualan
+  output$total_penjualan <- renderValueBox({
+    data <- load_data()
+    total_penjualan <- sum(data$Total, na.rm = TRUE)  # Memastikan tidak ada NA yang mempengaruhi hasil
+    valueBox(
+      formatC(total_penjualan, format = "d", big.mark = ","),
+      "Total Penjualan",
+      icon = icon("credit-card"),
+      color = "aqua"
+    )
+  })
+  
+  # Total Jumlah Transaksi
+  output$total_transaksi <- renderValueBox({
+    data <- load_data()
+    total_transaksi <- nrow(data)  # Menghitung jumlah transaksi
+    valueBox(
+      formatC(total_transaksi, format = "d", big.mark = ","),
+      "Total Jumlah Transaksi",
+      icon = icon("exchange-alt"),
+      color = "yellow"
+    )
+  })
+  
+  # Total Jenis Produk
+  output$total_jenis_produk <- renderValueBox({
+    data <- tbl_produk %>% collect()  # Mengambil data produk
+    total_jenis_produk <- n_distinct(data$Kategori_Produk)  # Menghitung jumlah kategori produk unik
+    
+    # Menambahkan daftar jenis produk dalam valueBox
+    produk_jenis <- c(
+      "Health and beauty",
+      "Electronic accessories",
+      "Home and lifestyle",
+      "Sports and travel",
+      "Food and beverages",
+      "Fashion accessories"
+    )
+    
+    # Menampilkan hasil dalam valueBox dengan HTML() dan pemformatan yang lebih rapi
+    valueBox(
+      formatC(total_jenis_produk, format = "d", big.mark = ","),
+      HTML(paste("Total Jenis Produk", "<br>", paste(produk_jenis, collapse = "<br>"))),  # Menggunakan HTML() untuk menampilkan daftar jenis produk
+      icon = icon("box"),
+      color = "green"
+    )
+  })
+  
+  # Peta Lokasi Cabang (Koordinat)
+  cabang_data <- data.frame(
+    ID_Cabang = c("B0001", "B0002", "B0003"),
+    Kota = c("Naypyidaw", "Yangon", "Mandalay"),
+    lat = c(19.752162400254907, 16.86873053516028, 21.93920096942228),
+    lon = c(96.09634335734853, 96.14006796301643, 96.08698353742243)
+  )
+  
+  output$map <- renderLeaflet({
+    leaflet(cabang_data) %>%
+      addTiles() %>%  # Menambahkan layer peta dasar
+      addProviderTiles(providers$CartoDB.Positron) %>%  # Menambahkan layer CartoDB untuk peta lebih jelas
+      addMarkers(~lon, ~lat, popup = ~paste("Cabang: ", Kota))  # Menambahkan marker dengan popup nama kota
+  })
+}
+
+# Jalankan Aplikasi
+shinyApp(ui, server)
+
+
+
+
+
+
+
+```
+
+
+

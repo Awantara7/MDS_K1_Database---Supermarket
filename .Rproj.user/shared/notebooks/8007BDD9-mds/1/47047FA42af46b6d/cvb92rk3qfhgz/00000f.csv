@@ -1,0 +1,8 @@
+"0","# Koneksi ke database 'Data' di MySQL (port 3307)"
+"0","con <- dbConnect(RMariaDB::MariaDB(),"
+"0","                 dbname = ""data csv"",  # Nama database yang sudah ada"
+"0","                 host = ""127.0.0.1"",    "
+"0","                 port = 3307,  # Pastikan port yang benar (3307)"
+"0","                 user = ""root"",         "
+"0","                 password = """"  # Sesuaikan jika ada password"
+"0",")"

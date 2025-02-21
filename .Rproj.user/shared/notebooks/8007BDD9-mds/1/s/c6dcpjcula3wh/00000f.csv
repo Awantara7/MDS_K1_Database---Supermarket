@@ -1,0 +1,5 @@
+"0","# Load tabel dari database"
+"0","tbl_cabang <- tbl(con, ""Cabang"")"
+"0","tbl_invoice <- tbl(con, ""Invoice"")"
+"0","tbl_pelanggan <- tbl(con, ""Pelanggan"")"
+"0","tbl_produk <- tbl(con, ""Produk"")"
