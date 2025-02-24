@@ -48,6 +48,27 @@ print(tbl_produk)
 ```
 
 ```{r}
+library(dplyr)
+
+fix_data <- function(data) {
+  data %>%
+    mutate(
+      computed_total = Harga_Satuan * Kuantitas  # perkalian antara harga satuan dan kuantitas
+    )
+}
+```
+
+```{r}
+data_error <- function(data) {
+  data %>%
+    mutate(
+      computed_total = Harga_Satuan * Kuantitas
+    ) %>%
+    filter( abs(computed_total - Total_Harga) > 1 )  # Misalnya, jika selisih lebih dari 1, dianggap tidak konsisten.
+}
+```
+
+```{r}
 library(shiny)
 library(bs4Dash)
 library(shinymanager)
@@ -62,30 +83,15 @@ library(RMariaDB)
 library(glue)
 library(shinyjs)
 
-# Server function
-server <- function(input, output, session) {
-
-  # Database Connection
-  con <- dbConnect(RMariaDB::MariaDB(),
-                   dbname = "data_csv",
-                   host = "127.0.0.1",    
-                   port = 3307,
-                   user = "root",         
-                   password = "")
-
-  # Load tables
-  tbl_cabang <- tbl(con, "Cabang")
-  tbl_invoice <- tbl(con, "Invoice")
-  tbl_pelanggan <- tbl(con, "Pelanggan")
-  tbl_produk <- tbl(con, "Produk")  # Ensure this line is present
-
-  # Rest of your server code
+# Fungsi konversi nilai Total (jika data masih berupa karakter)
+convert_total <- function(x) {
+  as.numeric(gsub("[^0-9.-]", "", x))
 }
 
-# Data kredensial untuk autentikasi
+# Data kredensial (tambah akun wawan)
 credentials <- data.frame(
-  user = c("admin", "user1"),
-  password = c("admin123", "user123"),
+  user = c("admin", "user1", "wawan"),
+  password = c("admin123", "user123", "wawan"),
   stringsAsFactors = FALSE
 )
 
@@ -98,24 +104,9 @@ theme_colors <- list(
   text_dark = "#333333"
 )
 
-library(shiny)
-library(bs4Dash)
-library(shinymanager)
-library(shinyWidgets)
-library(highcharter)
-library(echarts4r)
-library(DT)
-library(leaflet)
-library(dplyr)
-library(DBI)
-library(RMariaDB)
-library(glue)
-library(shinyjs)
-
-# UI
+# UI -------------------------------------------------------------------------
 ui <- bs4DashPage(
   title = "WA-ONE SWALAYAN",
-  
   header = bs4DashNavbar(
     skin = "light",
     status = "white",
@@ -126,24 +117,22 @@ ui <- bs4DashPage(
     ),
     compact = FALSE
   ),
-  
   sidebar = bs4DashSidebar(
     skin = "light",
     status = "primary",
     title = "Menu",
     brandColor = "primary",
-    collapsed = FALSE,  # Sidebar not collapsed at start
+    collapsed = FALSE,
     bs4SidebarMenu(
       bs4SidebarMenuItem("Dashboard Penjualan", tabName = "penjualan", icon = icon("chart-line")),
       bs4SidebarMenuItem("Produk & Kategori", tabName = "produk", icon = icon("box")),
       bs4SidebarMenuItem("Segmentasi Pelanggan", tabName = "pelanggan", icon = icon("users")),
       bs4SidebarMenuItem("Performa Cabang", tabName = "cabang", icon = icon("store")),
+      bs4SidebarMenuItem("Data Quality", tabName = "dataquality", icon = icon("exclamation-triangle")),
       bs4SidebarMenuItem("Pengaturan", tabName = "settings", icon = icon("cogs"))
     )
   ),
-  
   body = bs4DashBody(
-    useShinydashboard(),
     useShinyjs(),
     tags$head(
       tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Roboto&display=swap"),
@@ -154,87 +143,135 @@ ui <- bs4DashPage(
       "))
     ),
     bs4TabItems(
-      # Dashboard Penjualan
-      bs4TabItem(tabName = "penjualan",
-                 fluidRow(
-                   bs4ValueBoxOutput("total_penjualan", width = 3),
-                   bs4ValueBoxOutput("performacabang", width = 3),
-                   bs4ValueBoxOutput("produk_terjual", width = 3),
-                   bs4ValueBoxOutput("total_transaksi", width = 3)
-                 ),
-                 fluidRow(
-                   bs4Card(title = "Total Penjualan per Waktu", width = 8,
-                           highchartOutput("plot_penjualan", height = "350px")),
-                   bs4Card(title = "Produk Terlaris", width = 4,
-                           echarts4rOutput("plot_produk_terlaris", height = "350px"))
-                 ),
-                 fluidRow(
-                   bs4Card(title = "Peta Penjualan per Kota", width = 12,
-                           leafletOutput("peta_penjualan", height = "400px"))
-                 ),
-                 fluidRow(
-                   bs4Card(title = "Data Transaksi", width = 12,
-                           DTOutput("table_transaksi"))
-                 )
+      # Tab: Dashboard Penjualan
+      bs4TabItem(
+        tabName = "penjualan",
+        fluidRow(
+          bs4ValueBoxOutput("total_penjualan", width = 3),
+          bs4ValueBoxOutput("performacabang", width = 3),
+          bs4ValueBoxOutput("produk_terjual", width = 3),
+          bs4ValueBoxOutput("total_transaksi", width = 3)
+        ),
+        # Grafik total penjualan per waktu dikelompokkan per kategori
+        fluidRow(
+          bs4Card(
+            title = "Total Penjualan per Waktu per Kategori", width = 12,
+            highchartOutput("plot_penjualan", height = "400px")
+          )
+        ),
+        fluidRow(
+          bs4Card(
+            title = "Produk Terlaris", width = 12,
+            echarts4rOutput("plot_produk_terlaris", height = "400px")
+          )
+        ),
+        fluidRow(
+          bs4Card(
+            title = "Peta Penjualan per Kota", width = 12,
+            leafletOutput("peta_penjualan", height = "400px")
+          )
+        ),
+        fluidRow(
+          bs4Card(
+            title = "Data Transaksi", width = 12,
+            DTOutput("table_transaksi")
+          )
+        )
       ),
-      
-      # Produk & Kategori
-      bs4TabItem(tabName = "produk",
-                 fluidRow(
-                   bs4Card(title = "Distribusi Penjualan per Kategori", width = 6,
-                           echarts4rOutput("pie_kategori", height = "350px")),
-                   bs4Card(title = "Perbandingan Penjualan Antar Produk", width = 6,
-                           echarts4rOutput("bar_produk", height = "350px"))
-                 ),
-                 fluidRow(
-                   bs4Card(title = "Tren Penjualan Produk", width = 12,
-                           highchartOutput("tren_produk", height = "400px"))
-                 )
+      # Tab: Produk & Kategori
+      bs4TabItem(
+        tabName = "produk",
+        fluidRow(
+          bs4Card(
+            title = "Distribusi Penjualan per Kategori", width = 6,
+            echarts4rOutput("pie_kategori", height = "400px")
+          ),
+          bs4Card(
+            title = "Perbandingan Penjualan Antar Produk", width = 6,
+            echarts4rOutput("bar_produk", height = "400px")
+          )
+        ),
+        fluidRow(
+          bs4Card(
+            title = "Tren Penjualan Produk", width = 12,
+            highchartOutput("tren_produk", height = "400px")
+          )
+        )
       ),
-      
-      # Segmentasi Pelanggan
-      bs4TabItem(tabName = "pelanggan",
-                 fluidRow(
-                   bs4Card(title = "Demografi Pelanggan", width = 6,
-                           echarts4rOutput("plot_demografi", height = "350px")),
-                   bs4Card(title = "Frekuensi Belanja", width = 6,
-                           highchartOutput("plot_frekuensi_belanja", height = "350px"))
-                 ),
-                 fluidRow(
-                   bs4Card(title = "RFM Analysis", width = 12,
-                           highchartOutput("rfm_analysis", height = "400px"))
-                 )
+      # Tab: Segmentasi Pelanggan
+      bs4TabItem(
+        tabName = "pelanggan",
+        fluidRow(
+          bs4Card(
+            title = "Demografi Pelanggan", width = 6,
+            echarts4rOutput("plot_demografi", height = "400px")
+          ),
+          bs4Card(
+            title = "Frekuensi Belanja", width = 6,
+            highchartOutput("plot_frekuensi_belanja", height = "400px")
+          )
+        ),
+        fluidRow(
+          bs4Card(
+            title = "RFM Analysis", width = 12,
+            highchartOutput("rfm_analysis", height = "400px")
+          )
+        )
       ),
-      
-      # Performa Cabang
-      bs4TabItem(tabName = "cabang",
-                 fluidRow(
-                   bs4Card(title = "Perbandingan Omzet Tiap Cabang", width = 6,
-                           echarts4rOutput("plot_omzet_cabang", height = "350px")),
-                   bs4Card(title = "Cabang Terbaik & Terburuk", width = 6,
-                           echarts4rOutput("plot_cabang_performa", height = "350px"))
-                 ),
-                 fluidRow(
-                   bs4Card(title = "Distribusi Cabang", width = 12,
-                           leafletOutput("map_cabang", height = "400px"))
-                 )
+      # Tab: Performa Cabang
+      bs4TabItem(
+        tabName = "cabang",
+        fluidRow(
+          bs4Card(
+            title = "Perbandingan Omzet Tiap Cabang", width = 6,
+            echarts4rOutput("plot_omzet_cabang", height = "400px")
+          ),
+          bs4Card(
+            title = "Cabang Terbaik & Terburuk", width = 6,
+            echarts4rOutput("plot_cabang_performa", height = "400px")
+          )
+        ),
+        fluidRow(
+          bs4Card(
+            title = "Distribusi Cabang", width = 12,
+            leafletOutput("map_cabang", height = "400px")
+          )
+        )
       ),
-      
-      # Pengaturan
-      bs4TabItem(tabName = "settings",
-                 h2("Pengaturan Aplikasi"),
-                 fluidRow(
-                   bs4Card(title = "Ubah Password", width = 6,
-                           passwordInput("old_password", "Password Lama"),
-                           passwordInput("new_password", "Password Baru"),
-                           actionButton("update_password", "Update Password", class = "btn btn-primary")
-                   ),
-                   bs4Card(title = "Preferensi", width = 6,
-                           checkboxInput("dark_mode", "Mode Gelap"),
-                           checkboxInput("notif_email", "Terima Notifikasi via Email"),
-                           actionButton("save_preferences", "Simpan Preferensi", class = "btn btn-success")
-                   )
-                 )
+      # Tab: Data Quality
+      bs4TabItem(
+        tabName = "dataquality",
+        fluidRow(
+          bs4Card(
+            title = "Data Lengkap", width = 12,
+            DTOutput("table_full")
+          )
+        ),
+        fluidRow(
+          bs4Card(
+            title = "Data Inconsistency", width = 12,
+            DTOutput("table_error")
+          )
+        )
+      ),
+      # Tab: Pengaturan
+      bs4TabItem(
+        tabName = "settings",
+        h2("Pengaturan Aplikasi"),
+        fluidRow(
+          bs4Card(
+            title = "Ubah Password", width = 6,
+            passwordInput("old_password", "Password Lama"),
+            passwordInput("new_password", "Password Baru"),
+            actionButton("update_password", "Update Password", class = "btn btn-primary")
+          ),
+          bs4Card(
+            title = "Preferensi", width = 6,
+            checkboxInput("dark_mode", "Mode Gelap"),
+            checkboxInput("notif_email", "Terima Notifikasi via Email"),
+            actionButton("save_preferences", "Simpan Preferensi", class = "btn btn-success")
+          )
+        )
       )
     )
   ),
@@ -257,61 +294,125 @@ ui <- bs4DashPage(
   )
 )
 
-
-# Server
+# ==============================================================================
+# Server Function
+# ==============================================================================
 server <- function(input, output, session) {
   
-  # Autentikasi pengguna
-  res_auth <- secure_server(
-    check_credentials = check_credentials(credentials)
-  )
-  output$res_auth <- renderPrint({
-    reactiveValuesToList(res_auth)
-  })
+  # Autentikasi
+  res_auth <- secure_server(check_credentials = check_credentials(credentials))
   
-  # Update pilihan produk
+  # Koneksi database dan load tabel
+  # Pastikan dbname sesuai: "data csv" jika itu nama sebenarnya
+  con <- dbConnect(RMariaDB::MariaDB(),
+                   dbname = "data csv",  
+                   host = "127.0.0.1",    
+                   port = 3307,
+                   user = "root",
+                   password = "")
+  
+  tbl_cabang <- tbl(con, "Cabang")
+  tbl_invoice <- tbl(con, "Invoice")
+  tbl_pelanggan <- tbl(con, "Pelanggan")
+  tbl_produk <- tbl(con, "Produk")
+  
+  # Lookup koordinat untuk Kota (disesuaikan dengan data)
+  city_coords <- data.frame(
+    Kota = c("Yangon", "Naypyitaw"),  # contoh data sesuai dengan data Anda
+    lat = c(16.8661, 19.7633),
+    lon = c(96.1951, 96.0810),
+    stringsAsFactors = FALSE
+  )
+  
+  # Update pilihan produk berdasarkan Kategori_Produk
   observe({
-    produk_list <- tbl_produk %>% select(ID_Produk) %>% collect() %>% pull()
+    produk_list <- tbl_produk %>% 
+      select(Kategori_Produk) %>% 
+      collect() %>% 
+      pull() %>% 
+      unique()
     updatePickerInput(session, "select_produk", choices = produk_list)
   })
   
-  # Reactive data loading
+  # Fungsi reactive untuk memuat data
   load_data <- reactive({
-    req(input$apply_filters)
-    isolate({
-      start_date <- as.character(input$dateRange[1])
-      end_date <- as.character(input$dateRange[2])
+    # Jika dateRange kosong, ambil seluruh data Invoice
+    if (is.null(input$dateRange) || length(input$dateRange) < 2 ||
+        any(nchar(input$dateRange) == 0)) {
+      invoice_data <- tbl_invoice %>% collect()
+    } else {
+      start_date <- input$dateRange[1]  # as Date
+      end_date   <- input$dateRange[2]
       
-      # Filter data menggunakan local()
       invoice_data <- tbl_invoice %>%
         filter(
-          Tanggal >= local(start_date),
-          Tanggal <= local(end_date)
-        ) %>%
-        collect()
-      
-      # Join dengan tabel lain
-      data <- invoice_data %>%
-        left_join(tbl_pelanggan %>% collect(), by = "ID_Pelanggan") %>%
-        left_join(tbl_produk %>% collect(), by = "ID_Produk") %>%
-        left_join(tbl_cabang %>% collect(), by = "ID_Cabang")
-      
-      # Filter berdasarkan produk jika dipilih
-      if (!is.null(input$select_produk) && length(input$select_produk) > 0) {
-        data <- data %>% filter(ID_Produk %in% input$select_produk)
-      }
-      data
-    })
+          as.Date(Tanggal) >= start_date,
+          as.Date(Tanggal) <= end_date
+        ) %>% collect()
+    }
+    
+    cat("Invoice data: ", nrow(invoice_data), "\n")
+    
+    invoice_data <- invoice_data %>% 
+      select(ID_Invoice, ID_Produk, ID_Cabang, ID_Pelanggan, Total, Tanggal, Waktu, Pembayaran, Penilaian)
+    
+    data_joined <- invoice_data %>%
+      left_join(tbl_pelanggan %>% collect(), by = "ID_Pelanggan") %>%
+      left_join(tbl_produk %>% select(-ID_Cabang) %>% collect(), by = "ID_Produk") %>%
+      left_join(tbl_cabang %>% collect(), by = "ID_Cabang")
+    
+    cat("Data joined: ", nrow(data_joined), "\n")
+    
+    if (!is.null(input$select_produk) && length(input$select_produk) > 0) {
+      data_joined <- data_joined %>% filter(Kategori_Produk %in% input$select_produk)
+    }
+    
+    cat("Data filtered: ", nrow(data_joined), "\n")
+    data_joined
+  })
+  
+  # Fungsi untuk Data Quality: hitung computed_total = Harga_Satuan * Kuantitas
+  fix_data <- reactive({
+    data <- load_data()
+    data %>% mutate(
+      computed_total = Harga_Satuan * Kuantitas  # asumsikan kolom Harga_Satuan dan Kuantitas numerik
+    )
+  })
+  
+  # Data Error: data di mana computed_total berbeda jauh dari Total_Harga
+  data_error <- reactive({
+    data <- fix_data()
+    data %>% filter( abs(computed_total - Total_Harga) > 1 )
+  })
+  
+  # Tampilkan Data Lengkap di Tab Data Quality
+  output$table_full <- renderDT({
+    data <- fix_data()
+    datatable(data, options = list(pageLength = 10, scrollX = TRUE))
+  })
+  
+  # Tampilkan Data Error di Tab Data Quality
+  output$table_error <- renderDT({
+    data <- data_error()
+    datatable(data, options = list(pageLength = 10, scrollX = TRUE))
   })
   
   # Total Penjualan
   output$total_penjualan <- renderbs4ValueBox({
     data <- load_data()
-    total_penjualan <- sum(data$Total, na.rm = TRUE)
+    if (nrow(data) == 0) {
+      return(bs4ValueBox(
+        value = "Rp 0",
+        subtitle = "Total Penjualan",
+        color = "primary",
+        icon = icon("credit-card")
+      ))
+    }
+    total_penjualan <- sum(as.numeric(data$Total), na.rm = TRUE)
     bs4ValueBox(
       value = paste0("Rp ", formatC(total_penjualan, format = "d", big.mark = ",")),
       subtitle = "Total Penjualan",
-      status = "primary",
+      color = "primary",
       icon = icon("credit-card")
     )
   })
@@ -319,15 +420,23 @@ server <- function(input, output, session) {
   # Performa Cabang
   output$performacabang <- renderbs4ValueBox({
     data <- load_data()
+    if (nrow(data) == 0) {
+      return(bs4ValueBox(
+        value = "-",
+        subtitle = "Cabang Terbaik",
+        color = "success",
+        icon = icon("store")
+      ))
+    }
     cabang_performance <- data %>%
-      group_by(Nama_Cabang) %>%
-      summarise(Total_Cabang = sum(Total, na.rm = TRUE)) %>%
+      group_by(ID_Cabang) %>%
+      summarise(Total_Cabang = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(Total_Cabang)) %>%
       slice(1)
     bs4ValueBox(
-      value = cabang_performance$Nama_Cabang,
+      value = cabang_performance$ID_Cabang,
       subtitle = "Cabang Terbaik",
-      status = "success",
+      color = "success",
       icon = icon("store")
     )
   })
@@ -335,11 +444,19 @@ server <- function(input, output, session) {
   # Produk Terjual
   output$produk_terjual <- renderbs4ValueBox({
     data <- load_data()
-    total_produk_terjual <- sum(data$Jumlah, na.rm = TRUE)
+    if (nrow(data) == 0) {
+      return(bs4ValueBox(
+        value = "0",
+        subtitle = "Produk Terjual",
+        color = "warning",
+        icon = icon("shopping-cart")
+      ))
+    }
+    total_produk_terjual <- sum(data$Kuantitas, na.rm = TRUE)
     bs4ValueBox(
       value = formatC(total_produk_terjual, format = "d", big.mark = ","),
       subtitle = "Produk Terjual",
-      status = "warning",
+      color = "warning",
       icon = icon("shopping-cart")
     )
   })
@@ -347,40 +464,69 @@ server <- function(input, output, session) {
   # Total Transaksi
   output$total_transaksi <- renderbs4ValueBox({
     data <- load_data()
+    if (nrow(data) == 0) {
+      return(bs4ValueBox(
+        value = "0",
+        subtitle = "Total Transaksi",
+        color = "info",
+        icon = icon("receipt")
+      ))
+    }
     total_transaksi <- nrow(data)
     bs4ValueBox(
       value = formatC(total_transaksi, format = "d", big.mark = ","),
       subtitle = "Total Transaksi",
-      status = "info",
+      color = "info",
       icon = icon("receipt")
     )
   })
   
-  # Visualisasi Penjualan per Waktu
+  # Visualisasi Penjualan per Waktu per Kategori  
   output$plot_penjualan <- renderHighchart({
     data <- load_data()
+    if(nrow(data)==0){
+      return(highchart() %>% hc_title(text = "Tidak ada data"))
+    }
+    # Kelompokkan data berdasarkan Tanggal dan Kategori_Produk
     penjualan_harian <- data %>%
-      group_by(Tanggal) %>%
-      summarise(Total_Penjualan = sum(Total, na.rm = TRUE))
+      group_by(Tanggal, Kategori_Produk) %>%
+      summarise(Total_Penjualan = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop")
+    
+    # Buat warna berbeda untuk setiap kategori menggunakan highcharter
+    categories <- unique(penjualan_harian$Kategori_Produk)
+    colors <- RColorBrewer::brewer.pal(min(length(categories), 8), "Set2")
+    
+    # Bagi data per kategori untuk membuat series
+    series_list <- lapply(categories, function(cat) {
+      subset_data <- penjualan_harian %>% filter(Kategori_Produk == cat)
+      list(
+        name = cat,
+        data = subset_data$Total_Penjualan,
+        color = colors[match(cat, categories)]
+      )
+    })
     
     highchart() %>%
-      hc_xAxis(categories = penjualan_harian$Tanggal) %>%
-      hc_add_series(name = "Penjualan", data = penjualan_harian$Total_Penjualan, type = "line") %>%
-      hc_title(text = "Total Penjualan per Hari") %>%
+      hc_xAxis(categories = unique(penjualan_harian$Tanggal)) %>%
+      hc_add_series_list(series_list) %>%
+      hc_title(text = "Total Penjualan per Waktu per Kategori") %>%
       hc_credits(enabled = FALSE)
   })
   
   # Visualisasi Produk Terlaris
   output$plot_produk_terlaris <- renderEcharts4r({
     data <- load_data()
+    if(nrow(data)==0){
+      return(e_charts() %>% e_title("Tidak ada data"))
+    }
     produk_terlaris <- data %>%
-      group_by(ID_Produk) %>%
-      summarise(Terjual = sum(Jumlah, na.rm = TRUE)) %>%
+      group_by(Kategori_Produk) %>%
+      summarise(Terjual = sum(Kuantitas, na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(Terjual)) %>%
       slice(1:5)
     
     produk_terlaris %>%
-      e_charts(ID_Produk) %>%
+      e_charts(Kategori_Produk) %>%
       e_bar(Terjual, name = "Terjual") %>%
       e_title("Produk Terlaris") %>%
       e_tooltip(trigger = "axis") %>%
@@ -390,19 +536,24 @@ server <- function(input, output, session) {
   # Peta Penjualan per Kota
   output$peta_penjualan <- renderLeaflet({
     data <- load_data()
+    if(nrow(data)==0){
+      return(leaflet() %>% addTiles() %>% addControl("Tidak ada data", position = "topright"))
+    }
     kota_penjualan <- data %>%
       group_by(Kota) %>%
-      summarise(Total_Penjualan = sum(Total, na.rm = TRUE)) %>%
-      left_join(tbl_cabang %>% select(Kota, lat, lon) %>% collect(), by = "Kota")
+      summarise(Total_Penjualan = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop")
+    
+    kota_penjualan <- kota_penjualan %>% left_join(city_coords, by = "Kota")
     
     leaflet(kota_penjualan) %>%
       addProviderTiles(providers$OpenStreetMap) %>%
       addCircleMarkers(
         ~lon, ~lat,
-        radius = ~sqrt(Total_Penjualan)/10000,
+        radius = ~ifelse(sqrt(Total_Penjualan)/10000 > 0, sqrt(Total_Penjualan)/10000, 1),
         color = theme_colors$primary,
         fillOpacity = 0.7,
-        popup = ~paste("<b>Kota:</b>", Kota, "<br><b>Total Penjualan:</b>", formatC(Total_Penjualan, format = "d", big.mark = ","))
+        popup = ~paste("<b>Kota:</b>", Kota, "<br><b>Total Penjualan:</b>",
+                       formatC(Total_Penjualan, format = "d", big.mark = ","))
       )
   })
   
@@ -415,12 +566,15 @@ server <- function(input, output, session) {
   # Visualisasi Distribusi Kategori
   output$pie_kategori <- renderEcharts4r({
     data <- load_data()
+    if(nrow(data)==0){
+      return(e_charts() %>% e_title("Tidak ada data"))
+    }
     kategori_data <- data %>%
-      group_by(Kategori) %>%
-      summarise(Penjualan = sum(Total, na.rm = TRUE))
+      group_by(Kategori_Produk) %>%
+      summarise(Penjualan = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop")
     
     kategori_data %>%
-      e_charts(Kategori) %>%
+      e_charts(Kategori_Produk) %>%
       e_pie(Penjualan, radius = c("50%", "70%")) %>%
       e_title("Distribusi Penjualan per Kategori") %>%
       e_tooltip(trigger = "item") %>%
@@ -430,14 +584,17 @@ server <- function(input, output, session) {
   # Visualisasi Perbandingan Penjualan Antar Produk
   output$bar_produk <- renderEcharts4r({
     data <- load_data()
+    if(nrow(data)==0){
+      return(e_charts() %>% e_title("Tidak ada data"))
+    }
     produk_data <- data %>%
-      group_by(ID_Produk) %>%
-      summarise(Penjualan = sum(Total, na.rm = TRUE)) %>%
+      group_by(Kategori_Produk) %>%
+      summarise(Penjualan = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(Penjualan)) %>%
       slice(1:10)
     
     produk_data %>%
-      e_charts(ID_Produk) %>%
+      e_charts(Kategori_Produk) %>%
       e_bar(Penjualan, name = "Penjualan") %>%
       e_title("Top 10 Produk Berdasarkan Penjualan") %>%
       e_tooltip(trigger = "axis") %>%
@@ -448,18 +605,21 @@ server <- function(input, output, session) {
   # Visualisasi Tren Penjualan Produk
   output$tren_produk <- renderHighchart({
     data <- load_data()
+    if(nrow(data)==0){
+      return(highchart() %>% hc_title(text = "Tidak ada data"))
+    }
     produk_tren <- data %>%
-      group_by(Tanggal, ID_Produk) %>%
-      summarise(Penjualan = sum(Total, na.rm = TRUE)) %>%
+      group_by(Tanggal, Kategori_Produk) %>%
+      summarise(Penjualan = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop") %>%
       arrange(Tanggal)
     
     highchart() %>%
       hc_title(text = "Tren Penjualan Produk") %>%
       hc_xAxis(type = "datetime", labels = list(format = '{value:%Y-%m-%d}')) %>%
       hc_add_series_list(
-        lapply(split(produk_tren, produk_tren$ID_Produk), function(df) {
+        lapply(split(produk_tren, produk_tren$Kategori_Produk), function(df) {
           list(
-            name = unique(df$ID_Produk),
+            name = unique(df$Kategori_Produk),
             data = list_parse2(df[, c("Tanggal", "Penjualan")])
           )
         })
@@ -471,12 +631,15 @@ server <- function(input, output, session) {
   # Visualisasi Demografi Pelanggan
   output$plot_demografi <- renderEcharts4r({
     data <- load_data()
+    if(nrow(data)==0){
+      return(e_charts() %>% e_title("Tidak ada data"))
+    }
     demografi_data <- data %>%
-      group_by(Gender) %>%
-      summarise(Jumlah = n())
+      group_by(Jenis_Kelamin) %>%
+      summarise(Jumlah = n(), .groups = "drop")
     
     demografi_data %>%
-      e_charts(Gender) %>%
+      e_charts(Jenis_Kelamin) %>%
       e_pie(Jumlah, radius = "50%") %>%
       e_title("Demografi Pelanggan") %>%
       e_tooltip(trigger = "item") %>%
@@ -486,11 +649,14 @@ server <- function(input, output, session) {
   # Visualisasi Frekuensi Belanja
   output$plot_frekuensi_belanja <- renderHighchart({
     data <- load_data()
+    if(nrow(data)==0){
+      return(highchart() %>% hc_title(text = "Tidak ada data"))
+    }
     frekuensi_belanja <- data %>%
       group_by(ID_Pelanggan) %>%
-      summarise(Frekuensi = n()) %>%
+      summarise(Frekuensi = n(), .groups = "drop") %>%
       group_by(Frekuensi) %>%
-      summarise(Jumlah_Pelanggan = n())
+      summarise(Jumlah_Pelanggan = n(), .groups = "drop")
     
     highchart() %>%
       hc_chart(type = "column") %>%
@@ -503,15 +669,21 @@ server <- function(input, output, session) {
   # Visualisasi RFM Analysis
   output$rfm_analysis <- renderHighchart({
     data <- load_data()
+    if(nrow(data)==0){
+      return(highchart() %>% hc_title(text = "Tidak ada data"))
+    }
     now <- Sys.Date()
     rfm_data <- data %>%
       group_by(ID_Pelanggan) %>%
       summarise(
-        Recency = as.numeric(difftime(now, max(Tanggal), units = "days")),
+        Recency = as.numeric(difftime(now, as.Date(Tanggal), units = "days")),
         Frequency = n(),
-        Monetary = sum(Total, na.rm = TRUE)
+        Monetary = sum(as.numeric(Total), na.rm = TRUE),
+        .groups = "drop"
       )
-    
+    if(all(is.na(rfm_data$Recency))){
+      rfm_data$Recency <- 0
+    }
     highchart() %>%
       hc_add_series(data = rfm_data, type = "scatter",
                     hcaes(x = Recency, y = Frequency, size = Monetary)) %>%
@@ -525,13 +697,16 @@ server <- function(input, output, session) {
   # Visualisasi Omzet Cabang
   output$plot_omzet_cabang <- renderEcharts4r({
     data <- load_data()
+    if(nrow(data)==0){
+      return(e_charts() %>% e_title("Tidak ada data"))
+    }
     cabang_data <- data %>%
-      group_by(Nama_Cabang) %>%
-      summarise(Omzet = sum(Total, na.rm = TRUE)) %>%
+      group_by(ID_Cabang) %>%
+      summarise(Omzet = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(Omzet))
     
     cabang_data %>%
-      e_charts(Nama_Cabang) %>%
+      e_charts(ID_Cabang) %>%
       e_bar(Omzet, name = "Omzet") %>%
       e_title("Omzet per Cabang") %>%
       e_tooltip(trigger = "axis") %>%
@@ -542,9 +717,12 @@ server <- function(input, output, session) {
   # Visualisasi Cabang Terbaik & Terburuk
   output$plot_cabang_performa <- renderEcharts4r({
     data <- load_data()
+    if(nrow(data)==0){
+      return(e_charts() %>% e_title("Tidak ada data"))
+    }
     cabang_performance <- data %>%
-      group_by(Nama_Cabang) %>%
-      summarise(Omzet = sum(Total, na.rm = TRUE)) %>%
+      group_by(ID_Cabang) %>%
+      summarise(Omzet = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(Omzet))
     
     best_branch <- cabang_performance %>% slice(1)
@@ -553,7 +731,7 @@ server <- function(input, output, session) {
     combined <- rbind(best_branch, worst_branch)
     
     combined %>%
-      e_charts(Nama_Cabang) %>%
+      e_charts(ID_Cabang) %>%
       e_bar(Omzet, name = "Omzet") %>%
       e_title("Cabang Terbaik & Terburuk") %>%
       e_tooltip(trigger = "axis") %>%
@@ -564,16 +742,17 @@ server <- function(input, output, session) {
   # Peta Distribusi Cabang
   output$map_cabang <- renderLeaflet({
     cabang_coords <- tbl_cabang %>% collect()
+    cabang_map <- left_join(cabang_coords, city_coords, by = "Kota")
     
-    leaflet(cabang_coords) %>%
+    leaflet(cabang_map) %>%
       addProviderTiles(providers$OpenStreetMap) %>%
       addMarkers(
         ~lon, ~lat,
-        popup = ~paste0("<b>", Nama_Cabang, "</b><br>Alamat: ", Alamat)
+        popup = ~paste0("<b>", ID_Cabang, "</b><br>Kota: ", Kota)
       )
   })
   
-  # Handle aksi pada tab Pengaturan
+  # Aksi pada tab Pengaturan
   observeEvent(input$update_password, {
     showModal(modalDialog(
       title = "Password Updated",
@@ -587,19 +766,20 @@ server <- function(input, output, session) {
     showNotification("Preferensi Anda telah disimpan.", type = "message")
   })
   
-  # Notifikasi jika total penjualan melebihi angka tertentu
   observe({
     data <- load_data()
-    total_penjualan <- sum(data$Total, na.rm = TRUE)
+    total_penjualan <- sum(convert_total(data$Total), na.rm = TRUE)
     if(total_penjualan > 100000000){
       showNotification("Penjualan hari ini melebihi 100 juta!", type = "message")
     }
   })
+  
+  onStop(function() {
+    dbDisconnect(con)
+  })
 }
 
-# Secure UI
 secure_ui <- secure_app(ui)
 
-# Jalankan Aplikasi
 shinyApp(secure_ui, server)
 ```
