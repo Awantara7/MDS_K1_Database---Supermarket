@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ```{r}
 library(shiny)
 library(shinythemes)
@@ -32,8 +31,6 @@ con <- dbConnect(RMariaDB::MariaDB(),
                  password = ""  # Sesuaikan jika ada password
 )
 ```
-
-
 
 ```{r}
 # Load tabel dari database
@@ -167,13 +164,4 @@ server <- function(input, output, session) {
 
 # Jalankan Aplikasi
 shinyApp(ui, server)
-
-
-
-
-
 ```
-
-
-
-

@@ -1,0 +1,2 @@
+"0","# Cek struktur tabel setelah perubahan"
+"0","dbGetQuery(con, ""DESCRIBE cabang"")"
