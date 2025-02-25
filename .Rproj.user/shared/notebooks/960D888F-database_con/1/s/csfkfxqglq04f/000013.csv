@@ -1,0 +1,75 @@
+"0","# 1. Baca dan Masukkan Data Cabang"
+"0","data_cabang <- read_delim(""data/cabang.csv"", delim = "";"")"
+"1","[1mRows: [22m[34m1000[39m [1mColumns: [22m[34m3[39m
+"
+"1","[36m──[39m [1mColumn specification[22m [36m─────────────────────────────────────────────────────────────────────[39m
+[1mDelimiter:[22m "";""
+[31mchr[39m (2): ID_Cabang, Kota
+[32mdbl[39m (1): ID_Produk
+"
+"1","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message.
+"
+"0","dbWriteTable(con, ""cabang"", data_cabang, append = TRUE, row.names = FALSE)"
+"0",""
+"0","# 2. Baca dan Masukkan Data Produk"
+"0","data_produk <- read_delim(""data/produk.csv"", delim = "";"")"
+"1","[1mRows: [22m[34m1000[39m [1mColumns: [22m[34m6[39m
+"
+"1","[36m──[39m [1mColumn specification[22m [36m─────────────────────────────────────────────────────────────────────[39m
+[1mDelimiter:[22m "";""
+[31mchr[39m (3): Kategori_Produk, Total_Harga, ID_Cabang
+[32mdbl[39m (3): ID_Produk, Harga_Satuan, Kuantitas
+"
+"1","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message.
+"
+"0","# Perbaiki format angka dengan menghapus titik pemisah ribuan"
+"0","data_produk <- data_produk %>%"
+"0","  mutate("
+"0","    Total_Harga = as.numeric(gsub(""\\."", """", Total_Harga))"
+"0","  )"
+"0",""
+"0","dbWriteTable(con, ""produk"", data_produk, append = TRUE, row.names = FALSE)"
+"0",""
+"0","# 3. Baca dan Masukkan Data Pelanggan"
+"0","data_pelanggan <- read_delim(""data/pelanggan.csv"", delim = "";"")"
+"1","[1mRows: [22m[34m1000[39m [1mColumns: [22m[34m3[39m
+"
+"1","[36m──[39m [1mColumn specification[22m [36m─────────────────────────────────────────────────────────────────────[39m
+[1mDelimiter:[22m "";""
+[31mchr[39m (3): ID_Pelanggan, Tipe_Pelanggan, Jenis_Kelamin
+"
+"1","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message.
+"
+"0","dbWriteTable(con, ""pelanggan"", data_pelanggan, append = TRUE, row.names = FALSE)"
+"0",""
+"0","# 4. Baca dan Masukkan Data Invoice"
+"0","data_invoice <- read_delim(""data/invoice.csv"", delim = "";"")"
+"1","[1mRows: [22m[34m1000[39m [1mColumns: [22m[34m9[39m
+"
+"1","[36m──[39m [1mColumn specification[22m [36m─────────────────────────────────────────────────────────────────────[39m
+[1mDelimiter:[22m "";""
+[31mchr[39m  (6): ID_Invoice, ID_Cabang, ID_Pelanggan, Total, Tanggal, Pembayaran
+[32mdbl[39m  (2): ID_Produk, Penilaian
+[34mtime[39m (1): Waktu
+"
+"1","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message.
+"
+"0","# Perbaiki format angka dengan menghapus titik pemisah ribuan"
+"0","data_invoice <- data_invoice %>%"
+"0","  mutate("
+"0","    Total = as.numeric(gsub(""\\."", """", Total))"
+"0","  )"
+"0",""
+"0","# Konversi tanggal ke format yang sesuai"
+"0","data_invoice <- data_invoice %>%"
+"0","  mutate(Tanggal = as.Date(Tanggal, format = ""%m/%d/%Y""))"
+"0",""
+"0","dbWriteTable(con, ""invoice"", data_invoice, append = TRUE, row.names = FALSE)"
