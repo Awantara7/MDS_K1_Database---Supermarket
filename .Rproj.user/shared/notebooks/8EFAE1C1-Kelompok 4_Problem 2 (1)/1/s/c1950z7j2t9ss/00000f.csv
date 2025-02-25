@@ -1,3 +1,0 @@
-"0","#Load Dataaset"
-"0","test_data <- read_excel(""C:/Users/ASUS ROG/Downloads/Problem 2-20250119T221602Z-001/Problem 2/test.xlsx"")"
-"0","train_data <- read_excel(""C:/Users/ASUS ROG/Downloads/Problem 2-20250119T221602Z-001/Problem 2/train.xlsx"")"
