@@ -1,0 +1,167 @@
+"0","install.packages(""DBI"")          # Untuk koneksi ke database"
+"1","Error in "
+"1",""
+"1","install.packages"
+"1",""
+"1"," : "
+"1",""
+"1","Updating loaded packages"
+"1",""
+"1","
+"
+"2","Warning message:
+"
+"2","package ‘RMariaDB’ was built under R version 4.4.2 
+"
+"0","install.packages(""RMariaDB"")      # Driver MariaDB/MySQL untuk R"
+"1","Error in "
+"1",""
+"1","install.packages"
+"1",""
+"1"," : "
+"1",""
+"1","Updating loaded packages"
+"1",""
+"1","
+"
+"0","install.packages(""readr"")         # Untuk membaca file CSV"
+"2","WARNING: Rtools is required to build R packages but is not currently installed. Please download and install the appropriate version of Rtools before proceeding:
+
+https://cran.rstudio.com/bin/windows/Rtools/
+"
+"2","Installing package into ‘C:/Users/My System/AppData/Local/R/win-library/4.4’
+(as ‘lib’ is unspecified)
+"
+"2","trying URL 'https://cran.rstudio.com/bin/windows/contrib/4.4/readr_2.1.5.zip'
+"
+"2","Content type 'application/zip'"
+"2"," length 1223109 bytes (1.2 MB)
+"
+"2","downloaded 1.2 MB
+
+"
+"1","package ‘readr’ successfully unpacked and MD5 sums checked
+"
+"1","
+"
+"1",""
+"1","The downloaded binary packages are in
+	C:\Users\My System\AppData\Local\Temp\RtmpqifEwy\downloaded_packages"
+"1",""
+"1","
+"
+"0","install.packages(""DBI"")"
+"2","WARNING: Rtools is required to build R packages but is not currently installed. Please download and install the appropriate version of Rtools before proceeding:
+
+https://cran.rstudio.com/bin/windows/Rtools/
+"
+"2","Installing package into ‘C:/Users/My System/AppData/Local/R/win-library/4.4’
+(as ‘lib’ is unspecified)
+"
+"2","trying URL 'https://cran.rstudio.com/bin/windows/contrib/4.4/DBI_1.2.3.zip'
+"
+"2","Content type 'application/zip'"
+"2"," length 941295 bytes (919 KB)
+"
+"2","downloaded 919 KB
+
+"
+"1","package ‘DBI’ successfully unpacked and MD5 sums checked
+"
+"1","
+"
+"1",""
+"1","The downloaded binary packages are in
+	C:\Users\My System\AppData\Local\Temp\RtmpqifEwy\downloaded_packages"
+"1",""
+"1","
+"
+"0","install.packages(""RMariaDB"")"
+"1","Error in "
+"1",""
+"1","install.packages"
+"1",""
+"1"," : "
+"1",""
+"1","Updating loaded packages"
+"1",""
+"1","
+"
+"0","library(DBI)"
+"2","Warning:"
+"2"," package ‘DBI’ was built under R version 4.4.2
+"
+"0","install.packages(""DiagrammeR"")    # Untuk membuat diagram ERD"
+"1","Error in "
+"1",""
+"1","install.packages"
+"1",""
+"1"," : "
+"1",""
+"1","Updating loaded packages"
+"1",""
+"1","
+"
+"0","install.packages(""glue"")          # Untuk memudahkan string SQL"
+"2","WARNING: Rtools is required to build R packages but is not currently installed. Please download and install the appropriate version of Rtools before proceeding:
+
+https://cran.rstudio.com/bin/windows/Rtools/
+"
+"2","Installing package into ‘C:/Users/My System/AppData/Local/R/win-library/4.4’
+(as ‘lib’ is unspecified)
+"
+"2","trying URL 'https://cran.rstudio.com/bin/windows/contrib/4.4/glue_1.8.0.zip'
+"
+"2","Content type 'application/zip'"
+"2"," length 184144 bytes (179 KB)
+"
+"2","downloaded 179 KB
+
+"
+"1","package ‘glue’ successfully unpacked and MD5 sums checked
+"
+"1","
+"
+"1",""
+"1","The downloaded binary packages are in
+	C:\Users\My System\AppData\Local\Temp\RtmpqifEwy\downloaded_packages"
+"1",""
+"1","
+"
+"0","install.packages(""dplyr"")         # Untuk manipulasi data"
+"2","WARNING: Rtools is required to build R packages but is not currently installed. Please download and install the appropriate version of Rtools before proceeding:
+
+https://cran.rstudio.com/bin/windows/Rtools/
+"
+"2","Installing package into ‘C:/Users/My System/AppData/Local/R/win-library/4.4’
+(as ‘lib’ is unspecified)
+"
+"2","trying URL 'https://cran.rstudio.com/bin/windows/contrib/4.4/dplyr_1.1.4.zip'
+"
+"2","Content type 'application/zip'"
+"2"," length 1590307 bytes (1.5 MB)
+"
+"2","downloaded 1.5 MB
+
+"
+"1","package ‘dplyr’ successfully unpacked and MD5 sums checked
+"
+"1","
+"
+"1",""
+"1","The downloaded binary packages are in
+	C:\Users\My System\AppData\Local\Temp\RtmpqifEwy\downloaded_packages"
+"1",""
+"1","
+"
+"0","install.packages(""tidyverse"")     # Kumpulan paket untuk analisis data"
+"1","Error in "
+"1",""
+"1","install.packages"
+"1",""
+"1"," : "
+"1",""
+"1","Updating loaded packages"
+"1",""
+"1","
+"
