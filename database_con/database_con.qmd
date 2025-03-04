@@ -120,11 +120,11 @@ dbListTables(con)
 
 ```{r}
 # 1. Baca dan Masukkan Data Cabang
-data_cabang <- read_delim("data/cabang.csv", delim = ";")
+data_cabang <- read_delim("D:\\TUGAS KEOMPOK PRAKTIKUM MDS\\MDS_K1_Database---Supermarket\\data\\cabang.csv", delim = ";")
 dbWriteTable(con, "cabang", data_cabang, append = TRUE, row.names = FALSE)
 
 # 2. Baca dan Masukkan Data Produk
-data_produk <- read_delim("data/produk.csv", delim = ";")
+data_produk <- read_delim("D:\\TUGAS KEOMPOK PRAKTIKUM MDS\\MDS_K1_Database---Supermarket\\data\\produk.csv", delim = ";")
 
 # Perbaiki format angka dengan menghapus titik pemisah ribuan
 data_produk <- data_produk %>%
@@ -135,11 +135,11 @@ data_produk <- data_produk %>%
 dbWriteTable(con, "produk", data_produk, append = TRUE, row.names = FALSE)
 
 # 3. Baca dan Masukkan Data Pelanggan
-data_pelanggan <- read_delim("data/pelanggan.csv", delim = ";")
+data_pelanggan <- read_delim("D:\\TUGAS KEOMPOK PRAKTIKUM MDS\\MDS_K1_Database---Supermarket\\data\\pelanggan.csv", delim = ";")
 dbWriteTable(con, "pelanggan", data_pelanggan, append = TRUE, row.names = FALSE)
 
 # 4. Baca dan Masukkan Data Invoice
-data_invoice <- read_delim("data/invoice.csv", delim = ";")
+data_invoice <- read_delim("D:\\TUGAS KEOMPOK PRAKTIKUM MDS\\MDS_K1_Database---Supermarket\\data\\invoice.csv", delim = ";")
 
 # Perbaiki format angka dengan menghapus titik pemisah ribuan
 data_invoice <- data_invoice %>%
@@ -159,11 +159,6 @@ dbWriteTable(con, "invoice", data_invoice, append = TRUE, row.names = FALSE)
 ```{r}
 # Cek apakah tabel tersedia di database
 dbListTables(con)
-```
-
-```{r}
-# Cek contoh data
-dbGetQuery(con, "SELECT * FROM invoice LIMIT 5")
 ```
 
 ```{r}
