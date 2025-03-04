@@ -1,2 +1,0 @@
-"0","# Cek contoh data"
-"0","dbGetQuery(con, ""SELECT * FROM invoice LIMIT 5"")"
