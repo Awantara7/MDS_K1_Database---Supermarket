@@ -41,7 +41,7 @@ db_config <- list(
   port = 3307,         # Sesuaikan dengan port MySQL di DBngin
   user = "root",
   password = "",
-  dbname = "data_csv"
+  dbname = "data csv"
 )
 
 # Buat koneksi tanpa database terlebih dahulu
@@ -52,8 +52,8 @@ con <- dbConnect(MariaDB(),
                  password = "")
 
 # Buat database jika belum ada
-dbExecute(con, glue("CREATE DATABASE IF NOT EXISTS {db_config$dbname}"))
-dbExecute(con, glue("USE {db_config$dbname}"))
+dbExecute(con, glue("CREATE DATABASE IF NOT EXISTS `{db_config$dbname}`"))
+dbExecute(con, glue("USE `{db_config$dbname}`"))
 
 # Tutup koneksi sementara
 dbDisconnect(con)
@@ -127,11 +127,11 @@ dbListTables(con)
 
 ```{r}
 # 1. Baca dan Masukkan Data Cabang
-data_cabang <- read_delim("data/cabang.csv", delim = ";")
+data_cabang <- read_delim("https://raw.githubusercontent.com/Awantara7/MDS_K1_Database---Supermarket/refs/heads/main/data/Cabang.csv", delim = ";")
 dbWriteTable(con, "cabang", data_cabang, append = TRUE, row.names = FALSE)
 
 # 2. Baca dan Masukkan Data Produk
-data_produk <- read_delim("data/produk.csv", delim = ";")
+data_produk <- read_delim("https://raw.githubusercontent.com/Awantara7/MDS_K1_Database---Supermarket/refs/heads/main/data/Produk.csv", delim = ";")
 
 # Perbaiki format angka dengan menghapus titik pemisah ribuan
 data_produk <- data_produk %>%
@@ -142,11 +142,11 @@ data_produk <- data_produk %>%
 dbWriteTable(con, "produk", data_produk, append = TRUE, row.names = FALSE)
 
 # 3. Baca dan Masukkan Data Pelanggan
-data_pelanggan <- read_delim("data/pelanggan.csv", delim = ";")
+data_pelanggan <- read_delim("https://raw.githubusercontent.com/Awantara7/MDS_K1_Database---Supermarket/refs/heads/main/data/Pelanggan.csv", delim = ";")
 dbWriteTable(con, "pelanggan", data_pelanggan, append = TRUE, row.names = FALSE)
 
 # 4. Baca dan Masukkan Data Invoice
-data_invoice <- read_delim("data/invoice.csv", delim = ";")
+data_invoice <- read_delim("https://raw.githubusercontent.com/Awantara7/MDS_K1_Database---Supermarket/refs/heads/main/data/Invoice.csv", delim = ";")
 
 # Perbaiki format angka dengan menghapus titik pemisah ribuan
 data_invoice <- data_invoice %>%
@@ -174,6 +174,7 @@ dbGetQuery(con, "DESCRIBE cabang")
 dbGetQuery(con, "DESCRIBE produk")
 dbGetQuery(con, "DESCRIBE pelanggan")
 dbGetQuery(con, "DESCRIBE invoice")
+dbGetQuery(con, "DESCRIBE cabang.csv")
 ```
 
 ```{r}
@@ -453,34 +454,32 @@ ui <- bs4DashPage(
 # ==============================================================================
 # Server Function
 # ==============================================================================
+
 server <- function(input, output, session) {
   
-  # Autentikasi
   res_auth <- secure_server(check_credentials = check_credentials(credentials))
   
-  # Koneksi database dan load tabel
-  # Pastikan dbname sesuai: "data csv" jika itu nama sebenarnya
-  con <- dbConnect(RMariaDB::MariaDB(),
-                   dbname = "data csv",  
-                   host = "127.0.0.1",    
-                   port = 3307,
-                   user = "root",
-                   password = "")
+  con <- dbConnect(
+    RMariaDB::MariaDB(),
+    dbname = "data csv",  
+    host = "127.0.0.1",    
+    port = 3307,
+    user = "root",
+    password = ""
+  )
   
-  tbl_cabang <- tbl(con, "Cabang")
-  tbl_invoice <- tbl(con, "Invoice")
+  tbl_cabang    <- tbl(con, "Cabang")
+  tbl_invoice   <- tbl(con, "Invoice")
   tbl_pelanggan <- tbl(con, "Pelanggan")
-  tbl_produk <- tbl(con, "Produk")
+  tbl_produk    <- tbl(con, "Produk")
   
-  # Lookup koordinat untuk Kota (disesuaikan dengan data)
   city_coords <- data.frame(
-    Kota = c("Yangon", "Naypyitaw"),  # contoh data sesuai dengan data Anda
-    lat = c(16.8661, 19.7633),
-    lon = c(96.1951, 96.0810),
+    Kota = c("Yangon", "Naypyitaw","Mandalay"), 
+    lat  = c(16.8661, 19.7633, 21.9602),  
+    lon  = c(96.1951, 96.0810, 96.1012),
     stringsAsFactors = FALSE
   )
   
-  # Update pilihan produk berdasarkan Kategori_Produk
   observe({
     produk_list <- tbl_produk %>% 
       select(Kategori_Produk) %>% 
@@ -490,15 +489,13 @@ server <- function(input, output, session) {
     updatePickerInput(session, "select_produk", choices = produk_list)
   })
   
-  # Fungsi reactive untuk memuat data
   load_data <- reactive({
-    # Jika dateRange kosong, ambil seluruh data Invoice
-    if (is.null(input$dateRange) || length(input$dateRange) < 2 ||
-        any(nchar(input$dateRange) == 0)) {
+    if (is.null(input$select_year) || input$select_year == "") {
       invoice_data <- tbl_invoice %>% collect()
     } else {
-      start_date <- input$dateRange[1]  # as Date
-      end_date   <- input$dateRange[2]
+      selected_year <- as.numeric(input$select_year)
+      start_date <- as.Date(paste0(selected_year, "-01-01"))
+      end_date   <- as.Date(paste0(selected_year, "-12-31"))
       
       invoice_data <- tbl_invoice %>%
         filter(
@@ -527,53 +524,52 @@ server <- function(input, output, session) {
     data_joined
   })
   
-  # Fungsi untuk Data Quality: hitung computed_total = Harga_Satuan * Kuantitas
   fix_data <- reactive({
     data <- load_data()
     data %>% mutate(
-      computed_total = Harga_Satuan * Kuantitas  # asumsikan kolom Harga_Satuan dan Kuantitas numerik
+      computed_total = Harga_Satuan * Kuantitas  # asumsi kolom Harga_Satuan dan Kuantitas numerik
     )
   })
   
-  # Data Error: data di mana computed_total berbeda jauh dari Total_Harga
   data_error <- reactive({
     data <- fix_data()
     data %>% filter( abs(computed_total - Total_Harga) > 1 )
   })
   
-  # Tampilkan Data Lengkap di Tab Data Quality
   output$table_full <- renderDT({
     data <- fix_data()
     datatable(data, options = list(pageLength = 10, scrollX = TRUE))
   })
   
-  # Tampilkan Data Error di Tab Data Quality
   output$table_error <- renderDT({
     data <- data_error()
     datatable(data, options = list(pageLength = 10, scrollX = TRUE))
   })
   
-  # Total Penjualan
   output$total_penjualan <- renderbs4ValueBox({
     data <- load_data()
+    
     if (nrow(data) == 0) {
-      return(bs4ValueBox(
-        value = "Rp 0",
+        return(bs4ValueBox(
+            value = "Rp 0",
+            subtitle = "Total Penjualan",
+            color = "primary",
+            icon = icon("credit-card")
+        ))
+    }
+    
+    total_penjualan <- sum(as.numeric(Total), na.rm = TRUE)
+    
+    bs4ValueBox(
+        value = paste0("Rp ", formatC(total_penjualan, format = "d", big.mark = ",")),
         subtitle = "Total Penjualan",
         color = "primary",
         icon = icon("credit-card")
-      ))
-    }
-    total_penjualan <- sum(as.numeric(data$Total), na.rm = TRUE)
-    bs4ValueBox(
-      value = paste0("Rp ", formatC(total_penjualan, format = "d", big.mark = ",")),
-      subtitle = "Total Penjualan",
-      color = "primary",
-      icon = icon("credit-card")
     )
-  })
+})
+
+   
   
-  # Performa Cabang
   output$performacabang <- renderbs4ValueBox({
     data <- load_data()
     if (nrow(data) == 0) {
@@ -597,7 +593,6 @@ server <- function(input, output, session) {
     )
   })
   
-  # Produk Terjual
   output$produk_terjual <- renderbs4ValueBox({
     data <- load_data()
     if (nrow(data) == 0) {
@@ -617,7 +612,6 @@ server <- function(input, output, session) {
     )
   })
   
-  # Total Transaksi
   output$total_transaksi <- renderbs4ValueBox({
     data <- load_data()
     if (nrow(data) == 0) {
@@ -637,22 +631,18 @@ server <- function(input, output, session) {
     )
   })
   
-  # Visualisasi Penjualan per Waktu per Kategori  
   output$plot_penjualan <- renderHighchart({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(highchart() %>% hc_title(text = "Tidak ada data"))
     }
-    # Kelompokkan data berdasarkan Tanggal dan Kategori_Produk
     penjualan_harian <- data %>%
       group_by(Tanggal, Kategori_Produk) %>%
       summarise(Total_Penjualan = sum(as.numeric(Total), na.rm = TRUE), .groups = "drop")
     
-    # Buat warna berbeda untuk setiap kategori menggunakan highcharter
     categories <- unique(penjualan_harian$Kategori_Produk)
     colors <- RColorBrewer::brewer.pal(min(length(categories), 8), "Set2")
     
-    # Bagi data per kategori untuk membuat series
     series_list <- lapply(categories, function(cat) {
       subset_data <- penjualan_harian %>% filter(Kategori_Produk == cat)
       list(
@@ -669,7 +659,6 @@ server <- function(input, output, session) {
       hc_credits(enabled = FALSE)
   })
   
-  # Visualisasi Produk Terlaris
   output$plot_produk_terlaris <- renderEcharts4r({
     data <- load_data()
     if(nrow(data)==0){
@@ -689,10 +678,9 @@ server <- function(input, output, session) {
       e_legend(show = FALSE)
   })
   
-  # Peta Penjualan per Kota
   output$peta_penjualan <- renderLeaflet({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(leaflet() %>% addTiles() %>% addControl("Tidak ada data", position = "topright"))
     }
     kota_penjualan <- data %>%
@@ -713,16 +701,14 @@ server <- function(input, output, session) {
       )
   })
   
-  # Data Transaksi
   output$table_transaksi <- renderDT({
     data <- load_data()
     datatable(data, options = list(pageLength = 10, scrollX = TRUE))
   })
   
-  # Visualisasi Distribusi Kategori
   output$pie_kategori <- renderEcharts4r({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(e_charts() %>% e_title("Tidak ada data"))
     }
     kategori_data <- data %>%
@@ -737,10 +723,9 @@ server <- function(input, output, session) {
       e_legend(orient = "vertical", left = "left")
   })
   
-  # Visualisasi Perbandingan Penjualan Antar Produk
   output$bar_produk <- renderEcharts4r({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(e_charts() %>% e_title("Tidak ada data"))
     }
     produk_data <- data %>%
@@ -758,10 +743,9 @@ server <- function(input, output, session) {
       e_legend(show = FALSE)
   })
   
-  # Visualisasi Tren Penjualan Produk
   output$tren_produk <- renderHighchart({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(highchart() %>% hc_title(text = "Tidak ada data"))
     }
     produk_tren <- data %>%
@@ -771,23 +755,29 @@ server <- function(input, output, session) {
     
     highchart() %>%
       hc_title(text = "Tren Penjualan Produk") %>%
-      hc_xAxis(type = "datetime", labels = list(format = '{value:%Y-%m-%d}')) %>%
+      hc_xAxis(
+        type = "datetime", 
+        labels = list(format = '{value:%Y-%m-%d}')
+      ) %>%
       hc_add_series_list(
-        lapply(split(produk_tren, produk_tren$Kategori_Produk), function(df) {
-          list(
-            name = unique(df$Kategori_Produk),
-            data = list_parse2(df[, c("Tanggal", "Penjualan")])
-          )
-        })
+        lapply(
+          split(produk_tren, produk_tren$Kategori_Produk), 
+          function(df) {
+            list(
+              name = unique(df$Kategori_Produk),
+              data = list_parse2(df[, c("Tanggal", "Penjualan")])
+            )
+          }
+        )
       ) %>%
       hc_tooltip(shared = TRUE) %>%
       hc_credits(enabled = FALSE)
   })
   
-  # Visualisasi Demografi Pelanggan
+  # Segmentasi Pelanggan
   output$plot_demografi <- renderEcharts4r({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(e_charts() %>% e_title("Tidak ada data"))
     }
     demografi_data <- data %>%
@@ -797,35 +787,65 @@ server <- function(input, output, session) {
     demografi_data %>%
       e_charts(Jenis_Kelamin) %>%
       e_pie(Jumlah, radius = "50%") %>%
-      e_title("Demografi Pelanggan") %>%
+      e_title("Demografi Pelanggan (Jenis Kelamin)") %>%
       e_tooltip(trigger = "item") %>%
       e_legend(orient = "vertical", left = "left")
   })
   
-  # Visualisasi Frekuensi Belanja
-  output$plot_frekuensi_belanja <- renderHighchart({
+  output$plot_jenis_pelanggan <- renderEcharts4r({
     data <- load_data()
-    if(nrow(data)==0){
-      return(highchart() %>% hc_title(text = "Tidak ada data"))
+    if(nrow(data) == 0){
+      return(e_charts() %>% e_title("Tidak ada data"))
     }
-    frekuensi_belanja <- data %>%
-      group_by(ID_Pelanggan) %>%
-      summarise(Frekuensi = n(), .groups = "drop") %>%
-      group_by(Frekuensi) %>%
-      summarise(Jumlah_Pelanggan = n(), .groups = "drop")
+    jenis_data <- data %>%
+      group_by(Jenis_Pelanggan) %>%
+      summarise(Jumlah = n(), .groups = "drop")
     
-    highchart() %>%
-      hc_chart(type = "column") %>%
-      hc_title(text = "Frekuensi Belanja Pelanggan") %>%
-      hc_xAxis(categories = as.character(frekuensi_belanja$Frekuensi)) %>%
-      hc_add_series(name = "Jumlah Pelanggan", data = frekuensi_belanja$Jumlah_Pelanggan) %>%
-      hc_credits(enabled = FALSE)
+    jenis_data %>%
+      e_charts(Jenis_Pelanggan) %>%
+      e_bar(Jumlah, name = "Jumlah") %>%
+      e_title("Segmentasi Jenis Pelanggan") %>%
+      e_tooltip(trigger = "axis") %>%
+      e_legend(show = FALSE)
   })
   
-  # Visualisasi RFM Analysis
+  output$plot_tipe_pelanggan <- renderEcharts4r({
+    data <- load_data()
+    if(nrow(data) == 0){
+      return(e_charts() %>% e_title("Tidak ada data"))
+    }
+    tipe_data <- data %>%
+      group_by(Tipe_Pelanggan) %>%
+      summarise(Jumlah = n(), .groups = "drop")
+    
+    tipe_data %>%
+      e_charts(Tipe_Pelanggan) %>%
+      e_bar(Jumlah, name = "Jumlah") %>%
+      e_title("Segmentasi Tipe Pelanggan") %>%
+      e_tooltip(trigger = "axis") %>%
+      e_legend(show = FALSE)
+  })
+  
+  output$plot_jenis_pembayaran <- renderEcharts4r({
+    data <- load_data()
+    if(nrow(data) == 0){
+      return(e_charts() %>% e_title("Tidak ada data"))
+    }
+    bayar_data <- data %>%
+      group_by(Pembayaran) %>%
+      summarise(Jumlah = n(), .groups = "drop")
+    
+    bayar_data %>%
+      e_charts(Pembayaran) %>%
+      e_pie(Jumlah, radius = "50%") %>%
+      e_title("Segmentasi Jenis Pembayaran") %>%
+      e_tooltip(trigger = "item") %>%
+      e_legend(orient = "vertical", left = "left")
+  })
+  
   output$rfm_analysis <- renderHighchart({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(highchart() %>% hc_title(text = "Tidak ada data"))
     }
     now <- Sys.Date()
@@ -850,10 +870,9 @@ server <- function(input, output, session) {
       hc_credits(enabled = FALSE)
   })
   
-  # Visualisasi Omzet Cabang
   output$plot_omzet_cabang <- renderEcharts4r({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(e_charts() %>% e_title("Tidak ada data"))
     }
     cabang_data <- data %>%
@@ -870,10 +889,9 @@ server <- function(input, output, session) {
       e_legend(show = FALSE)
   })
   
-  # Visualisasi Cabang Terbaik & Terburuk
   output$plot_cabang_performa <- renderEcharts4r({
     data <- load_data()
-    if(nrow(data)==0){
+    if(nrow(data) == 0){
       return(e_charts() %>% e_title("Tidak ada data"))
     }
     cabang_performance <- data %>%
@@ -895,7 +913,6 @@ server <- function(input, output, session) {
       e_legend(show = FALSE)
   })
   
-  # Peta Distribusi Cabang
   output$map_cabang <- renderLeaflet({
     cabang_coords <- tbl_cabang %>% collect()
     cabang_map <- left_join(cabang_coords, city_coords, by = "Kota")
@@ -908,7 +925,6 @@ server <- function(input, output, session) {
       )
   })
   
-  # Aksi pada tab Pengaturan
   observeEvent(input$update_password, {
     showModal(modalDialog(
       title = "Password Updated",
@@ -936,6 +952,9 @@ server <- function(input, output, session) {
 }
 
 secure_ui <- secure_app(ui)
-
 shinyApp(secure_ui, server)
+
+
 ```
+
+
