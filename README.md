@@ -111,7 +111,7 @@ Filter ini akan diterapkan secara otomatis ke seluruh visualisasi dan tabel yang
 
 **Back-End Developer**
 
-<img src="https://raw.githubusercontent.com/Awantara7/MDS_K1_Database---Supermarket/64bd08985f540880822d3d34cab26c3af01d36be/images/back_end.jpg" width="150" height="150" alt="Foto Tim" style="border-radius: 50%;">
+<img src="images/back_end2.jpg" width="150" height="150" alt="Foto Tim" style="border-radius: 50%;">
 
 - Nama: I Gede Awantara
 
