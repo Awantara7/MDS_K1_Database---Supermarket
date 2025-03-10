@@ -121,7 +121,7 @@ Filter ini akan diterapkan secara otomatis ke seluruh visualisasi dan tabel yang
 
 **DB-Manager**
 
-<img src="https://raw.githubusercontent.com/Awantara7/MDS_K1_Database---Supermarket/64bd08985f540880822d3d34cab26c3af01d36be/images/db_manager.jpg" width="150" height="150" alt="Foto Tim" style="border-radius: 50%;">
+<img src="images/db_manager.jpg" width="150" height="150" alt="Foto Tim" style="border-radius: 50%;">
 
 - Nama: Wawan Saputra
 
